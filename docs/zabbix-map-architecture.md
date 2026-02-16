@@ -88,6 +88,20 @@ A modelagem para representar cabos e linhas entre equipamentos deve seguir este 
 
 ---
 
+
+## 3.4 Renderização no frontend e coordenadas
+
+Para renderização de cabos:
+
+- cada cabo deve ser composto por `[origem, ...pontos_intermediarios, destino]`;
+- os pontos intermediários são definidos por `NetworkCablePoint` ordenado por `position`;
+- o frontend pode renderizar via SVG (`polyline`) no MVP e evoluir para Canvas/WebGL em alta escala.
+
+Para compatibilidade com KMZ/KML e formatos GIS, recomenda-se explicitar em `NetworkMap` um `coordinate_system` (`screen|geo`).
+
+- `screen`: coordenadas de canvas (edição/topologia);
+- `geo`: coordenadas geográficas (export/import KML/KMZ/GeoJSON).
+
 ## 4) Convenções de consistência
 
 ## 4.1 API e versionamento

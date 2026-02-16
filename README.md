@@ -5,6 +5,8 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 ## Documentação
 
 - Visão de estrutura e diretrizes de consistência: [`docs/zabbix-map-architecture.md`](docs/zabbix-map-architecture.md)
+- Contrato sugerido para renderização no frontend: [`docs/api-contract.md`](docs/api-contract.md)
+- Compatibilidade e estratégia para KMZ/KML e correlatos: [`docs/kmz-compatibility.md`](docs/kmz-compatibility.md)
 
 ## Estado atual
 
