@@ -10,7 +10,8 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 
 - Autenticação com Devise + JWT;
 - Usuários, organizações e memberships com perfis (`admin`, `editor`, `viewer`);
-- Namespace de API versionada em `/api/v1`.
+- Namespace de API versionada em `/api/v1`;
+- Modelagem inicial para mapas de rede com nós, cabos e pontos de linha.
 
 ## Como subir o projeto
 

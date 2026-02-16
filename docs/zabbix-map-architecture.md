@@ -9,8 +9,8 @@ Construir uma API Rails multi-tenant para:
 - autenticação de usuários;
 - isolamento por organização;
 - integração com Zabbix para leitura de hosts, triggers e links;
-- composição e persistência de mapas operacionais;
-- disponibilização de dados para front-end de visualização de mapas.
+- composição e persistência de mapas de rede;
+- disponibilização de dados para front-end de visualização de topologia.
 
 ---
 
@@ -30,10 +30,10 @@ Atualmente o projeto já possui uma base sólida de autenticação e organizaç�
 
 ### Lacunas para integração com mapas do Zabbix
 
-- Não há modelos para domínio de mapa (mapa, nó, link, layout);
-- Não há camada explícita de integração com Zabbix (client/adapters/services);
-- Não há políticas de autorização por recurso (ex.: Pundit/CanCan);
-- Não há endpoints de negócio para sincronização e leitura de dados operacionais.
+- domínio de mapas de rede/cabos ainda em evolução;
+- ausência de client/service explícitos para integração Zabbix;
+- políticas de autorização por recurso ainda não implementadas;
+- inexistência de endpoints de sincronização de topologia.
 
 ---
 
@@ -50,28 +50,40 @@ Adotar a seguinte separação para manter consistência:
 - `app/policies/...` (se adotado): autorização por recurso e ação;
 - `app/serializers/...` (ou Jbuilder): contrato de resposta da API.
 
-## 3.2 Domínio mínimo sugerido
+## 3.2 Modelagem de rede (foco em linhas/cabos)
 
-Modelos iniciais para mapas:
+A modelagem para representar cabos e linhas entre equipamentos deve seguir este desenho:
 
-- `Map`
-  - `organization_id`, `name`, `description`, `zabbix_mapid` (opcional), `source_type` (`zabbix`, `manual`, `hybrid`)
+- `NetworkMap`
+  - escopo por organização;
+  - identifica a topologia (manual, zabbix ou híbrida).
+
 - `MapNode`
-  - `map_id`, `node_type` (`host`, `host_group`, `trigger`, `shape`, `text`), `label`, `x`, `y`, `metadata:jsonb`, `zabbix_ref`
-- `MapLink`
-  - `map_id`, `from_node_id`, `to_node_id`, `link_type`, `metadata:jsonb`
-- `ZabbixConnection`
-  - `organization_id`, `base_url`, `api_token` (criptografado), `default` (boolean)
-- `SyncJob` (opcional)
-  - auditoria de sincronizações, status, erros e tempo de execução
+  - representa equipamentos/entidades no canvas (switch, router, server, etc.);
+  - possui coordenadas base (`x`, `y`) para renderização.
+
+- `NetworkCable`
+  - representa a conexão entre dois nós (`source_node` e `target_node`);
+  - guarda tipo (`copper`, `fiber`, `wireless`, `logical`), status (`up/down/degraded/unknown`), capacidade e metadados.
+
+- `NetworkCablePoint`
+  - define os pontos intermediários da linha (polyline), permitindo desenhar curvas/quebras de cabo no mapa;
+  - ordenado por `position`.
+
+### 3.2.1 Regras essenciais de integridade
+
+- `source_node` e `target_node` devem ser diferentes;
+- ambos os nós devem pertencer ao mesmo `NetworkMap` do cabo;
+- não permitir duplicidade da mesma conexão no mesmo mapa (`network_map_id + source_node_id + target_node_id`);
+- pontos de cabo devem ter `position` única por cabo.
 
 ## 3.3 Fluxo de integração com Zabbix
 
 1. Usuário autentica na API (`JWT`).
 2. API resolve organização ativa (via membership/contexto).
-3. Service consulta `ZabbixConnection` da organização.
+3. Service consulta conexão Zabbix da organização.
 4. `Zabbix::Client` executa chamadas JSON-RPC.
-5. Service normaliza payload em entidades internas (`Map`, `MapNode`, `MapLink`).
+5. Service normaliza payload para `NetworkMap`, `MapNode` e `NetworkCable`.
 6. API responde em contrato estável para o front-end.
 
 ---
@@ -86,15 +98,15 @@ Modelos iniciais para mapas:
 
 ## 4.2 Segurança
 
-- Nunca retornar segredos (`api_token`) em responses;
+- Nunca retornar segredos em responses;
 - Armazenar credenciais de integração de forma criptografada;
 - Exigir autorização por organização em toda operação de mapas;
 - Log sanitizado para evitar vazamento de payload sensível.
 
 ## 4.3 Regras de autorização (RBAC)
 
-- `admin`: gerencia conexão Zabbix, usuários e mapas;
-- `editor`: cria/edita mapas e sincroniza dados;
+- `admin`: gerencia integração Zabbix, usuários e mapas;
+- `editor`: cria/edita topologia e sincroniza dados;
 - `viewer`: apenas leitura.
 
 ## 4.4 Estratégia de erros
@@ -113,22 +125,22 @@ Padronizar códigos e payloads:
 
 ### Fase 1 — Fundação de domínio
 
-- Criar `Map`, `MapNode`, `MapLink`, `ZabbixConnection`;
-- Criar migrations com índices por `organization_id` e chaves de integridade;
-- Implementar endpoints CRUD de mapas.
+- implementar modelos/migrations de `NetworkMap`, `MapNode`, `NetworkCable` e `NetworkCablePoint`;
+- expor CRUD de mapas e nós;
+- expor CRUD de cabos e pontos de rota.
 
 ### Fase 2 — Integração Zabbix
 
-- Implementar `Zabbix::Client` (autenticação + chamadas JSON-RPC);
-- Criar services de import/sync (`Maps::SyncFromZabbix`);
-- Registrar falhas e métricas básicas de sincronização.
+- implementar `Zabbix::Client` (autenticação + chamadas JSON-RPC);
+- criar services de import/sync (`Maps::SyncFromZabbix`);
+- registrar falhas e métricas básicas de sincronização.
 
 ### Fase 3 — Governança e escalabilidade
 
-- Adotar policies para autorização granular;
-- Testes de request + serviços de integração;
-- Jobs assíncronos para sincronização e refresh periódico;
-- Observabilidade (logs estruturados + tracing + métricas).
+- adotar policies para autorização granular;
+- testes de request + serviços de integração;
+- jobs assíncronos para sincronização e refresh periódico;
+- observabilidade (logs estruturados + tracing + métricas).
 
 ---
 
@@ -141,11 +153,3 @@ Qualquer nova feature de mapas/Zabbix deve incluir:
 - autorização por organização/role;
 - testes (model + request + service, quando aplicável);
 - documentação atualizada (`README` + este documento).
-
----
-
-## 7) Próximos artefatos recomendados
-
-- `docs/api-contract.md` com exemplos de request/response;
-- `docs/rbac.md` com matriz de permissões por role;
-- `docs/zabbix-integration.md` com catálogo de métodos JSON-RPC usados.
