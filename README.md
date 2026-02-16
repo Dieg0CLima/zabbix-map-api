@@ -1,24 +1,40 @@
-# README
+# Zabbix Map API
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+API em Ruby on Rails para autenticação, multi-organização e evolução de um sistema de mapas integrado ao Zabbix.
 
-Things you may want to cover:
+## Documentação
 
-* Ruby version
+- Visão de estrutura e diretrizes de consistência: [`docs/zabbix-map-architecture.md`](docs/zabbix-map-architecture.md)
 
-* System dependencies
+## Estado atual
 
-* Configuration
+- Autenticação com Devise + JWT;
+- Usuários, organizações e memberships com perfis (`admin`, `editor`, `viewer`);
+- Namespace de API versionada em `/api/v1`.
 
-* Database creation
+## Como subir o projeto
 
-* Database initialization
+### Pré-requisitos
 
-* How to run the test suite
+- Ruby (versão definida no projeto/container)
+- Bundler
+- Banco de dados configurado em `config/database.yml`
 
-* Services (job queues, cache servers, search engines, etc.)
+### Setup
 
-* Deployment instructions
+```bash
+bundle install
+bin/rails db:prepare
+```
 
-* ...
+### Rodar aplicação
+
+```bash
+bin/rails server
+```
+
+### Rodar testes
+
+```bash
+bin/rails test
+```
