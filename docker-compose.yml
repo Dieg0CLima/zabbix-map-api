@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: zabbix_map_db
+    environment:
+      POSTGRES_DB: zabbix_map_api_development
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zabbix_map_api_development"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zabbix_map_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: development
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      RAILS_LOG_TO_STDOUT: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app:cached
+      - bundle_cache:/usr/local/bundle
+    command: >
+      sh -lc "
+        bundle install &&
+        bin/rails db:prepare &&
+        bin/rails server -b 0.0.0.0 -p 3000
+      "
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  bundle_cache:
