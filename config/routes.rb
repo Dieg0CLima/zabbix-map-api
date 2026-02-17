@@ -7,6 +7,16 @@ Rails.application.routes.draw do
       }
 
       get "me", to: "me#show"
+
+      resources :network_maps do
+        resources :map_nodes
+        resources :network_cables
+      end
+
+      resources :zabbix_connections do
+        resources :zabbix_hosts, only: :index
+        resources :zabbix_items, only: :index
+      end
     end
   end
 end
