@@ -12,7 +12,9 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
     render json: {
       data: {
         id: resource.id,
-        email: resource.email
+        email: resource.email,
+        org_id: resource.current_organization&.id,
+        admin: resource.admin?
       }
     }, status: :ok
   end
