@@ -5,7 +5,13 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    render json: { data: current_organization.zabbix_connections.order(:id).map { |connection| connection_payload(connection) } }, status: :ok
+    connections = if admin_without_organization_context?
+      ZabbixConnection.order(:id)
+    else
+      current_organization.zabbix_connections.order(:id)
+    end
+
+    render json: { data: connections.map { |connection| connection_payload(connection) } }, status: :ok
   end
 
   def show
@@ -13,6 +19,8 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def create
+    return if ensure_organization_context_for_creation!
+
     connection = current_organization.zabbix_connections.new(zabbix_connection_params)
 
     if connection.save
@@ -39,7 +47,13 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   private
 
   def set_zabbix_connection
-    @zabbix_connection = current_organization.zabbix_connections.find(params[:id])
+    connections_scope = if admin_without_organization_context?
+      ZabbixConnection
+    else
+      current_organization.zabbix_connections
+    end
+
+    @zabbix_connection = connections_scope.find(params[:id])
   end
 
   def zabbix_connection_params

@@ -5,7 +5,11 @@ class Api::V1::NetworkMapsController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    maps = current_organization.network_maps.includes(network_cables: :network_cable_points)
+    maps = if admin_without_organization_context?
+      NetworkMap.includes(network_cables: :network_cable_points)
+    else
+      current_organization.network_maps.includes(network_cables: :network_cable_points)
+    end
 
     render json: { data: maps.map { |map| network_map_payload(map) } }, status: :ok
   end
@@ -15,6 +19,8 @@ class Api::V1::NetworkMapsController < ApplicationController
   end
 
   def create
+    return if ensure_organization_context_for_creation!
+
     network_map = current_organization.network_maps.new(network_map_params)
 
     if network_map.save
@@ -41,7 +47,13 @@ class Api::V1::NetworkMapsController < ApplicationController
   private
 
   def set_network_map
-    @network_map = current_organization.network_maps.find(params[:id])
+    maps_scope = if admin_without_organization_context?
+      NetworkMap
+    else
+      current_organization.network_maps
+    end
+
+    @network_map = maps_scope.find(params[:id])
   end
 
   def network_map_params

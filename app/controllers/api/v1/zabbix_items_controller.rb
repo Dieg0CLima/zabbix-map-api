@@ -13,6 +13,12 @@ class Api::V1::ZabbixItemsController < ApplicationController
   private
 
   def set_zabbix_connection
-    @zabbix_connection = current_organization.zabbix_connections.find(params[:zabbix_connection_id])
+    connections_scope = if admin_without_organization_context?
+      ZabbixConnection
+    else
+      current_organization.zabbix_connections
+    end
+
+    @zabbix_connection = connections_scope.find(params[:zabbix_connection_id])
   end
 end

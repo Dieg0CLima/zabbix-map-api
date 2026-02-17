@@ -48,7 +48,13 @@ class Api::V1::NetworkCablesController < ApplicationController
   private
 
   def set_network_map
-    @network_map = current_organization.network_maps.find(params[:network_map_id])
+    maps_scope = if admin_without_organization_context?
+      NetworkMap
+    else
+      current_organization.network_maps
+    end
+
+    @network_map = maps_scope.find(params[:network_map_id])
   end
 
   def set_network_cable
