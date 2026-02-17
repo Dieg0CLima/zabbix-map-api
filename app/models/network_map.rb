@@ -1,5 +1,6 @@
 class NetworkMap < ApplicationRecord
   belongs_to :organization
+  belongs_to :zabbix_connection, optional: true
 
   has_many :map_nodes, dependent: :destroy
   has_many :network_cables, dependent: :destroy

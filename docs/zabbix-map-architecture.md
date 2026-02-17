@@ -102,6 +102,23 @@ Para compatibilidade com KMZ/KML e formatos GIS, recomenda-se explicitar em `Net
 - `screen`: coordenadas de canvas (edição/topologia);
 - `geo`: coordenadas geográficas (export/import KML/KMZ/GeoJSON).
 
+## 3.5 Múltiplas conexões Zabbix e cache local
+
+Para suportar múltiplos ambientes/clientes Zabbix por organização, adotar:
+
+- `ZabbixConnection` como entidade de conexão (URL, token, status, conexão padrão);
+- vínculo opcional de `NetworkMap` com `ZabbixConnection` para origem do mapa;
+- namespace `app/models/zabbix` para cache estruturado dos dados coletados:
+  - `Zabbix::Host` (tabela `zabbix_hosts`)
+  - `Zabbix::Item` (tabela `zabbix_items`)
+
+### Estratégia de ingestão
+
+1. API recebe/atualiza conexões em `ZabbixConnection`;
+2. job/service consulta API Zabbix por conexão;
+3. resposta é normalizada e persistida em `zabbix_hosts` e `zabbix_items`;
+4. mapas e visões usam este cache para reduzir acoplamento e melhorar performance.
+
 ## 4) Convenções de consistência
 
 ## 4.1 API e versionamento
