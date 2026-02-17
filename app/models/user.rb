@@ -17,4 +17,8 @@ class User < ApplicationRecord
   def membership_for(org_id)
     memberships.find_by(organization_id: org_id)
   end
+
+  def admin?
+    admin
+  end
 end

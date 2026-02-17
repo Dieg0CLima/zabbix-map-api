@@ -1,6 +1,21 @@
 # API Contract — Network Map (Frontend)
 
-Este documento descreve um contrato recomendado para o frontend consumir mapas, nós e cabos.
+Este documento descreve um contrato recomendado para o frontend consumir mapas, nós, cabos e conexões Zabbix.
+
+## 0) Segurança (padrão Devise + JWT)
+
+Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT:
+
+- `POST /api/v1/users/sign_in` para login (retorna `Authorization: Bearer <token>`).
+- `DELETE /api/v1/users/sign_out` para logout.
+- `POST /api/v1/users` para cadastro.
+- enviar sempre `Authorization: Bearer <token>` nas chamadas autenticadas.
+
+Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
+
+Também existe suporte a **admin global** (`users.admin = true`), que pode operar sem vínculo de membership e atuar em qualquer organização ao informar `organization_id` na requisição.
+
+---
 
 ## 1) Conceito de renderização
 
@@ -17,7 +32,50 @@ No frontend, cada cabo é renderizado assim:
 
 ---
 
-## 2) Exemplo de payload (GET /api/v1/network_maps/:id)
+## 2) Endpoints principais
+
+### Mapas
+
+- `GET /api/v1/network_maps`
+- `GET /api/v1/network_maps/:id`
+- `POST /api/v1/network_maps`
+- `PATCH /api/v1/network_maps/:id`
+- `DELETE /api/v1/network_maps/:id`
+
+### Nós (por mapa)
+
+- `GET /api/v1/network_maps/:network_map_id/map_nodes`
+- `GET /api/v1/network_maps/:network_map_id/map_nodes/:id`
+- `POST /api/v1/network_maps/:network_map_id/map_nodes`
+- `PATCH /api/v1/network_maps/:network_map_id/map_nodes/:id`
+- `DELETE /api/v1/network_maps/:network_map_id/map_nodes/:id`
+
+### Cabos (por mapa)
+
+- `GET /api/v1/network_maps/:network_map_id/network_cables`
+- `GET /api/v1/network_maps/:network_map_id/network_cables/:id`
+- `POST /api/v1/network_maps/:network_map_id/network_cables`
+- `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id`
+- `DELETE /api/v1/network_maps/:network_map_id/network_cables/:id`
+
+### Conexões Zabbix
+
+- `GET /api/v1/zabbix_connections`
+- `GET /api/v1/zabbix_connections/:id`
+- `POST /api/v1/zabbix_connections`
+- `PATCH /api/v1/zabbix_connections/:id`
+- `DELETE /api/v1/zabbix_connections/:id`
+
+### Dados sincronizados do Zabbix
+
+- `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts`
+- `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items`
+
+`zabbix_items` aceita filtro opcional: `?zabbix_host_id=<id>`.
+
+---
+
+## 3) Exemplo de payload (GET /api/v1/network_maps/:id)
 
 ```json
 {
@@ -25,8 +83,6 @@ No frontend, cada cabo é renderizado assim:
     "id": 10,
     "name": "Datacenter - Core",
     "source_type": "hybrid",
-    "coordinate_system": "screen",
-    "viewport": { "width": 1920, "height": 1080, "zoom": 1.0 },
     "nodes": [
       { "id": 101, "label": "SW-Core-01", "node_kind": "switch", "x": 300.0, "y": 220.0 },
       { "id": 102, "label": "FW-Edge-01", "node_kind": "firewall", "x": 760.0, "y": 210.0 }
@@ -52,7 +108,7 @@ No frontend, cada cabo é renderizado assim:
 
 ---
 
-## 3) Estratégia no frontend (React/Vue/Canvas/SVG)
+## 4) Estratégia no frontend (React/Vue/Canvas/SVG)
 
 ### SVG (recomendado para MVP)
 
@@ -72,7 +128,7 @@ No frontend, cada cabo é renderizado assim:
 
 ---
 
-## 4) Boas práticas de persistência
+## 5) Boas práticas de persistência
 
 - salvar coordenadas em decimal (já modelado) e manter precisão consistente;
 - normalizar ordenação de `network_cable_points` por `position`;
