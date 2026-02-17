@@ -15,6 +15,7 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 - Usuários, organizações e memberships com perfis (`admin`, `editor`, `viewer`);
 - Namespace de API versionada em `/api/v1`;
 - Modelagem inicial para mapas de rede com nós, cabos e pontos de linha.
+- Suporte a múltiplas conexões Zabbix (API e banco direto) por organização.
 
 ## Como subir o projeto
 

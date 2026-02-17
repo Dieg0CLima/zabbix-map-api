@@ -106,11 +106,24 @@ Para compatibilidade com KMZ/KML e formatos GIS, recomenda-se explicitar em `Net
 
 Para suportar múltiplos ambientes/clientes Zabbix por organização, adotar:
 
-- `ZabbixConnection` como entidade de conexão (URL, token, status, conexão padrão);
+- `ZabbixConnection` como entidade de conexão com `connection_mode` (`api`, `db`, `hybrid`), status e conexão padrão;
 - vínculo opcional de `NetworkMap` com `ZabbixConnection` para origem do mapa;
 - namespace `app/models/zabbix` para cache estruturado dos dados coletados:
   - `Zabbix::Host` (tabela `zabbix_hosts`)
   - `Zabbix::Item` (tabela `zabbix_items`)
+
+
+### Campos de formulário de conexão
+
+Para suportar API e conexão direta com banco do Zabbix, o formulário deve contemplar:
+
+- campos gerais: `name`, `connection_mode`, `default_connection`;
+- quando `connection_mode = api` ou `hybrid`:
+  - `base_url`, `api_token`;
+- quando `connection_mode = db` ou `hybrid`:
+  - `db_adapter`, `db_host`, `db_port`, `db_name`, `db_username`, `db_password`.
+
+Tokens e senhas devem ser armazenados de forma criptografada.
 
 ### Estratégia de ingestão
 
