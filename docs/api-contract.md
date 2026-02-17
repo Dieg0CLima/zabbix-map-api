@@ -13,6 +13,8 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
+Também existe suporte a **admin global** (`users.admin = true`), que pode operar sem vínculo de membership e atuar em qualquer organização ao informar `organization_id` na requisição.
+
 ---
 
 ## 1) Conceito de renderização

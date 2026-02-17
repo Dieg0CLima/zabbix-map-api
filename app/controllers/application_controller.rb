@@ -8,7 +8,11 @@ class ApplicationController < ActionController::API
       organization_id = params[:organization_id] || params[:org_id]
 
       if organization_id.present?
-        current_user.organizations.find_by(id: organization_id)
+        if current_user.admin?
+          Organization.find_by(id: organization_id)
+        else
+          current_user.organizations.find_by(id: organization_id)
+        end
       else
         current_user.current_organization
       end
@@ -28,6 +32,7 @@ class ApplicationController < ActionController::API
   end
 
   def require_editor_or_admin!
+    return if current_user.admin?
     return if current_membership&.role.in?(%w[admin editor])
 
     render json: { error: "Insufficient permissions" }, status: :forbidden
