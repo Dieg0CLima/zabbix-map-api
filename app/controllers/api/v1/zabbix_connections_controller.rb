@@ -57,7 +57,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def zabbix_connection_params
-    params.require(:zabbix_connection).permit(
+    permitted = params.require(:zabbix_connection).permit(
       :name,
       :organization_id,
       :status,
@@ -73,6 +73,9 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
       :db_password,
       metadata: {}
     )
+
+    permitted.delete(:db_password) if permitted[:db_password].blank?
+    permitted
   end
 
   def connection_payload(connection)
@@ -89,6 +92,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
       db_port: connection.db_port,
       db_name: connection.db_name,
       db_username: connection.db_username,
+      has_db_password: connection.db_password.present?,
       metadata: connection.metadata,
       last_synced_at: connection.last_synced_at
     }
