@@ -59,6 +59,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   def zabbix_connection_params
     params.require(:zabbix_connection).permit(
       :name,
+      :organization_id,
       :status,
       :base_url,
       :api_token,

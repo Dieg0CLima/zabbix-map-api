@@ -1,7 +1,7 @@
 class ZabbixConnection < ApplicationRecord
   STATUSES = %w[active inactive error].freeze
-  CONNECTION_MODES = %w[api db hybrid].freeze
-  DB_ADAPTERS = %w[postgresql mysql2].freeze
+  CONNECTION_MODES = %w[api database hybrid].freeze
+  DB_ADAPTERS = %w[postgresql mysql].freeze
 
   belongs_to :organization
 
@@ -27,6 +27,6 @@ class ZabbixConnection < ApplicationRecord
   end
 
   def db_enabled?
-    connection_mode.in?(%w[db hybrid])
+    connection_mode.in?(%w[database hybrid])
   end
 end
