@@ -42,4 +42,37 @@ class Api::V1::ZabbixConnectionsControllerTest < ActiveSupport::TestCase
       assert_equal "new-secret", permitted[:db_password]
     end
   end
+
+  test "assign_db_password sets password when provided" do
+    controller = Api::V1::ZabbixConnectionsController.new
+    connection = ZabbixConnection.new
+    raw_params = ActionController::Parameters.new(
+      zabbix_connection: {
+        db_password: "new-secret"
+      }
+    )
+
+    controller.stub(:params, raw_params) do
+      controller.send(:assign_db_password, connection)
+    end
+
+    assert_equal "new-secret", connection.db_password
+  end
+
+  test "assign_db_password keeps existing password when blank value is provided" do
+    controller = Api::V1::ZabbixConnectionsController.new
+    connection = ZabbixConnection.new
+    connection.db_password = "already-saved"
+    raw_params = ActionController::Parameters.new(
+      zabbix_connection: {
+        db_password: ""
+      }
+    )
+
+    controller.stub(:params, raw_params) do
+      controller.send(:assign_db_password, connection)
+    end
+
+    assert_equal "already-saved", connection.db_password
+  end
 end
