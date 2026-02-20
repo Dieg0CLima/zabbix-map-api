@@ -1,5 +1,3 @@
-require "pg"
-
 module Zabbix
   class DatabaseItemsFetcher
     DEFAULT_LIMIT = 200
@@ -15,65 +13,32 @@ module Zabbix
     end
 
     def call
-      validate_adapter!
+      rows = []
 
-      rows = if postgresql_adapter?
-        fetch_postgresql_rows
-      else
-        fetch_mysql_rows
+      database_connection.with_client do |client, adapter|
+        rows = if adapter == :postgresql
+          client.exec_params(postgresql_sql, sql_params).to_a
+        else
+          statement = client.prepare(mysql_sql)
+          begin
+            statement.execute(*sql_params).to_a
+          ensure
+            statement&.close
+          end
+        end
       end
 
       rows.map { |row| normalize_row(row) }
-    rescue *database_error_classes => e
+    rescue Zabbix::DatabaseConnection::UnsupportedAdapterError => e
+      raise UnsupportedAdapterError, e.message
+    rescue Zabbix::DatabaseConnection::Error => e
       raise Error, e.message
-    ensure
-      @db_client&.close
     end
 
     private
 
-    def validate_adapter!
-      return if postgresql_adapter? || mysql_adapter?
-
-      raise UnsupportedAdapterError, "Only postgresql and mysql adapters are currently supported"
-    end
-
-    def postgresql_adapter?
-      @connection.db_adapter == "postgresql"
-    end
-
-    def mysql_adapter?
-      @connection.db_adapter == "mysql"
-    end
-
-    def fetch_postgresql_rows
-      @db_client = PG.connect(db_config)
-      @db_client.exec_params(postgresql_sql, sql_params)
-    end
-
-    def fetch_mysql_rows
-      @db_client = mysql_client_class.new(symbolize_keys(db_config))
-      statement = @db_client.prepare(mysql_sql)
-      statement.execute(*sql_params).to_a
-    ensure
-      statement&.close
-    end
-
-    def mysql_client_class
-      require "mysql2"
-      Mysql2::Client
-    rescue LoadError => e
-      raise Error, "mysql2 gem is required to query MySQL databases (#{e.message})"
-    end
-
-    def db_config
-      {
-        host: @connection.db_host,
-        port: @connection.db_port,
-        dbname: @connection.db_name,
-        user: @connection.db_username,
-        password: @connection.db_password
-      }
+    def database_connection
+      @database_connection ||= Zabbix::DatabaseConnection.new(connection: @connection)
     end
 
     def postgresql_sql
@@ -155,16 +120,6 @@ module Zabbix
       return if value.blank?
 
       Time.zone.at(value.to_i)
-    end
-
-    def database_error_classes
-      classes = [PG::Error]
-      classes << Mysql2::Error if defined?(Mysql2::Error)
-      classes
-    end
-
-    def symbolize_keys(hash)
-      hash.transform_keys(&:to_sym)
     end
   end
 end

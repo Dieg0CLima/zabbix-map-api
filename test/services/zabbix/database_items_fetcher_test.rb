@@ -22,10 +22,14 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
     ]
 
     fake_client.expect(:exec_params, fake_rows, [String, [50]])
-    fake_client.expect(:close, nil)
 
-    PG.stub(:connect, fake_client) do
-      items = Zabbix::DatabaseItemsFetcher.new(connection:, limit: 50).call
+    fake_database_connection = Minitest::Mock.new
+    fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
+
+    fetcher = Zabbix::DatabaseItemsFetcher.new(connection:, limit: 50)
+
+    fetcher.stub(:database_connection, fake_database_connection) do
+      items = fetcher.call
 
       assert_equal 1, items.size
       assert_equal "10101", items.first[:itemid]
@@ -35,6 +39,7 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
     end
 
     fake_client.verify
+    fake_database_connection.verify
   end
 
   test "uses hostid filter when provided for postgresql" do
@@ -42,13 +47,18 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
 
     fake_client = Minitest::Mock.new
     fake_client.expect(:exec_params, [], [String, ["10084", 200]])
-    fake_client.expect(:close, nil)
 
-    PG.stub(:connect, fake_client) do
-      Zabbix::DatabaseItemsFetcher.new(connection:, hostid: "10084").call
+    fake_database_connection = Minitest::Mock.new
+    fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
+
+    fetcher = Zabbix::DatabaseItemsFetcher.new(connection:, hostid: "10084")
+
+    fetcher.stub(:database_connection, fake_database_connection) do
+      fetcher.call
     end
 
     fake_client.verify
+    fake_database_connection.verify
   end
 
   test "fetches items from mysql adapter" do
@@ -60,19 +70,18 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
 
     fake_client = Minitest::Mock.new
     fake_client.expect(:prepare, fake_statement, [String])
-    fake_client.expect(:close, nil)
 
-    fake_mysql_class = Class.new do
-      define_singleton_method(:new) { |_config| fake_client }
-    end
+    fake_database_connection = Minitest::Mock.new
+    fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :mysql) }
 
     fetcher = Zabbix::DatabaseItemsFetcher.new(connection:)
-    fetcher.stub(:mysql_client_class, fake_mysql_class) do
+    fetcher.stub(:database_connection, fake_database_connection) do
       items = fetcher.call
       assert_equal "77", items.first[:itemid]
       assert_equal "srv-db-01", items.first.dig(:host, :name)
     end
 
+    fake_database_connection.verify
     fake_client.verify
     fake_statement.verify
   end
@@ -80,11 +89,20 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
   test "raises unsupported adapter error for unsupported adapters" do
     connection = build_connection(db_adapter: "sqlite")
 
-    error = assert_raises(Zabbix::DatabaseItemsFetcher::UnsupportedAdapterError) do
-      Zabbix::DatabaseItemsFetcher.new(connection:).call
+    fake_database_connection = Object.new
+    def fake_database_connection.with_client
+      raise Zabbix::DatabaseConnection::UnsupportedAdapterError, "Only postgresql and mysql adapters are currently supported"
     end
 
-    assert_equal "Only postgresql and mysql adapters are currently supported", error.message
+    fetcher = Zabbix::DatabaseItemsFetcher.new(connection:)
+
+    fetcher.stub(:database_connection, fake_database_connection) do
+      error = assert_raises(Zabbix::DatabaseItemsFetcher::UnsupportedAdapterError) do
+        fetcher.call
+      end
+
+      assert_equal "Only postgresql and mysql adapters are currently supported", error.message
+    end
   end
 
   private
