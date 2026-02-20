@@ -46,8 +46,7 @@ module Zabbix
           h.hostid::text AS hostid,
           h.host,
           h.name,
-          h.status::text AS status,
-          h.available::text AS available
+          h.status::text AS status
         FROM hosts h
         ORDER BY h.hostid
         LIMIT $1
@@ -60,8 +59,7 @@ module Zabbix
           CAST(h.hostid AS CHAR) AS hostid,
           h.host,
           h.name,
-          CAST(h.status AS CHAR) AS status,
-          CAST(h.available AS CHAR) AS available
+          CAST(h.status AS CHAR) AS status
         FROM hosts h
         ORDER BY h.hostid
         LIMIT ?
@@ -73,8 +71,7 @@ module Zabbix
         hostid: row["hostid"],
         host: row["host"],
         name: row["name"],
-        status: row["status"],
-        available: row["available"]
+        status: row["status"]
       }
     end
 

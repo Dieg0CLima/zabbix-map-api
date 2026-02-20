@@ -9,8 +9,7 @@ class Zabbix::DatabaseHostsFetcherTest < ActiveSupport::TestCase
         "hostid" => "10084",
         "host" => "srv-web-01",
         "name" => "Servidor Web 01",
-        "status" => "0",
-        "available" => "1"
+        "status" => "0"
       }
     ]
 
@@ -39,7 +38,7 @@ class Zabbix::DatabaseHostsFetcherTest < ActiveSupport::TestCase
     connection = build_connection(db_adapter: "mysql")
 
     fake_statement = Minitest::Mock.new
-    fake_statement.expect(:execute, [{ "hostid" => "500", "host" => "srv-db-01", "name" => "Servidor DB", "status" => "0", "available" => "1" }], [200])
+    fake_statement.expect(:execute, [{ "hostid" => "500", "host" => "srv-db-01", "name" => "Servidor DB", "status" => "0" }], [200])
     fake_statement.expect(:close, nil)
 
     fake_client = Minitest::Mock.new
