@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_17_130000) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -114,7 +114,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_17_130000) do
     t.bigint "organization_id", null: false
     t.string "name", null: false
     t.string "base_url"
-    t.string "api_token_ciphertext"
+    t.text "api_token_ciphertext"
     t.string "status", default: "active", null: false
     t.boolean "default_connection", default: false, null: false
     t.datetime "last_synced_at"
@@ -127,7 +127,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_17_130000) do
     t.integer "db_port"
     t.string "db_name"
     t.string "db_username"
-    t.string "db_password_ciphertext"
+    t.text "db_password"
     t.index ["organization_id", "connection_mode"], name: "idx_on_organization_id_connection_mode_c2700c34f1"
     t.index ["organization_id", "default_connection"], name: "index_zabbix_connections_on_org_default_true", unique: true, where: "(default_connection = true)"
     t.index ["organization_id", "name"], name: "index_zabbix_connections_on_organization_id_and_name", unique: true
