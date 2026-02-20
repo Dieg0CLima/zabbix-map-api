@@ -4,9 +4,17 @@ class Api::V1::ZabbixHostsController < ApplicationController
   before_action :set_zabbix_connection
 
   def index
-    hosts = @zabbix_connection.zabbix_hosts.order(:id)
+    hosts = if @zabbix_connection.db_enabled?
+      Zabbix::DatabaseHostsFetcher.new(connection: @zabbix_connection, limit: params[:limit]).call
+    else
+      @zabbix_connection.zabbix_hosts.order(:id)
+    end
 
     render json: { data: hosts }, status: :ok
+  rescue Zabbix::DatabaseHostsFetcher::UnsupportedAdapterError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue Zabbix::DatabaseHostsFetcher::Error => e
+    render json: { error: "Unable to fetch hosts from Zabbix database", details: e.message }, status: :service_unavailable
   end
 
   private
