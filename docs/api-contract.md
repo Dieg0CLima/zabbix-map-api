@@ -71,7 +71,9 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts`
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items`
 
-`zabbix_items` aceita filtro opcional: `?zabbix_host_id=<id>`.
+`zabbix_hosts` aceita parâmetro opcional `?limit=<n>` no modo de leitura direta no banco.
+
+`zabbix_items` aceita filtros opcionais: `?zabbix_host_id=<id>` (cache local), `?hostid=<id>` e `?limit=<n>` (leitura direta no banco).
 
 ---
 
