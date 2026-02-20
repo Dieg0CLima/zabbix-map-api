@@ -4,10 +4,23 @@ class Api::V1::ZabbixItemsController < ApplicationController
   before_action :set_zabbix_connection
 
   def index
-    items = @zabbix_connection.zabbix_items.order(:id)
-    items = items.where(zabbix_host_id: params[:zabbix_host_id]) if params[:zabbix_host_id].present?
+    items = if @zabbix_connection.db_enabled?
+      Zabbix::DatabaseItemsFetcher.new(
+        connection: @zabbix_connection,
+        hostid: params[:hostid],
+        limit: params[:limit]
+      ).call
+    else
+      scoped_items = @zabbix_connection.zabbix_items.order(:id)
+      scoped_items = scoped_items.where(zabbix_host_id: params[:zabbix_host_id]) if params[:zabbix_host_id].present?
+      scoped_items
+    end
 
     render json: { data: items }, status: :ok
+  rescue Zabbix::DatabaseItemsFetcher::UnsupportedAdapterError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue Zabbix::DatabaseItemsFetcher::Error => e
+    render json: { error: "Unable to fetch items from Zabbix database", details: e.message }, status: :service_unavailable
   end
 
   private

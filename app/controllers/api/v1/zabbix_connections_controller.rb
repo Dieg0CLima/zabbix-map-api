@@ -22,6 +22,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
     return if ensure_organization_context_for_creation!
 
     connection = current_organization.zabbix_connections.new(zabbix_connection_params)
+    assign_db_password(connection)
 
     if connection.save
       render json: { data: connection_payload(connection) }, status: :created
@@ -31,7 +32,10 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def update
-    if @zabbix_connection.update(zabbix_connection_params)
+    @zabbix_connection.assign_attributes(zabbix_connection_params)
+    assign_db_password(@zabbix_connection)
+
+    if @zabbix_connection.save
       render json: { data: connection_payload(@zabbix_connection) }, status: :ok
     else
       render json: { errors: @zabbix_connection.errors.full_messages }, status: :unprocessable_entity
@@ -57,7 +61,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def zabbix_connection_params
-    params.require(:zabbix_connection).permit(
+    permitted = params.require(:zabbix_connection).permit(
       :name,
       :organization_id,
       :status,
@@ -73,6 +77,19 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
       :db_password,
       metadata: {}
     )
+
+    permitted.delete(:db_password) if permitted[:db_password].blank?
+    permitted
+  end
+
+  def assign_db_password(connection)
+    raw_params = params[:zabbix_connection]
+    return unless raw_params.respond_to?(:key?) && raw_params.key?(:db_password)
+
+    raw_password = raw_params[:db_password]
+    return if raw_password.blank?
+
+    connection.db_password = raw_password
   end
 
   def connection_payload(connection)
@@ -89,6 +106,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
       db_port: connection.db_port,
       db_name: connection.db_name,
       db_username: connection.db_username,
+      has_db_password: connection.db_password.present?,
       metadata: connection.metadata,
       last_synced_at: connection.last_synced_at
     }

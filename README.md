@@ -43,3 +43,15 @@ bin/rails server
 ```bash
 bin/rails test
 ```
+
+## Consulta de itens do Zabbix
+
+O endpoint `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items` agora suporta leitura direta no banco do Zabbix quando a conexão estiver em modo `database` ou `hybrid`:
+
+- usa as credenciais cadastradas em `ZabbixConnection` (`db_host`, `db_port`, `db_name`, `db_username`, `db_password`);
+- atualmente suporta `db_adapter = postgresql` e `db_adapter = mysql`;
+- parâmetros opcionais para leitura direta:
+  - `hostid`: filtra itens por host no banco do Zabbix;
+  - `limit`: limita o volume retornado (padrão `200`, máximo `1000`).
+
+Quando a conexão não está com acesso a banco, o endpoint continua retornando itens do cache local (`zabbix_items`).
