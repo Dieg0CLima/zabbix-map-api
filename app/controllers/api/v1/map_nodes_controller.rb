@@ -54,6 +54,6 @@ class Api::V1::MapNodesController < ApplicationController
   end
 
   def map_node_params
-    params.require(:map_node).permit(:label, :node_kind, :x, :y, :zabbix_ref, metadata: {})
+    params.require(:map_node).permit(:external_id, :map_pop_id, :label, :node_kind, :x, :y, :lat, :lng, :icon, :color, :size, :zabbix_ref, metadata: {})
   end
 end

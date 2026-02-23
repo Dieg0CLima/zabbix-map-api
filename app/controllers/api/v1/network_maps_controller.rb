@@ -6,9 +6,9 @@ class Api::V1::NetworkMapsController < ApplicationController
 
   def index
     maps = if admin_without_organization_context?
-      NetworkMap.includes(network_cables: :network_cable_points)
+      NetworkMap.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points)
     else
-      current_organization.network_maps.includes(network_cables: :network_cable_points)
+      current_organization.network_maps.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points)
     end
 
     render json: { data: maps.map { |map| network_map_payload(map) } }, status: :ok
@@ -57,7 +57,7 @@ class Api::V1::NetworkMapsController < ApplicationController
   end
 
   def network_map_params
-    params.require(:network_map).permit(:name, :description, :source_type, :zabbix_mapid, :zabbix_connection_id)
+    params.require(:network_map).permit(:name, :description, :source_type, :zabbix_mapid, :zabbix_connection_id, :active_base_layer)
   end
 
   def network_map_payload(network_map)
@@ -69,27 +69,49 @@ class Api::V1::NetworkMapsController < ApplicationController
       source_type: network_map.source_type,
       zabbix_mapid: network_map.zabbix_mapid,
       zabbix_connection_id: network_map.zabbix_connection_id,
+      active_base_layer: network_map.active_base_layer,
+      pops: network_map.map_pops.order(:id).map do |pop|
+        {
+          id: pop.external_id || pop.id,
+          name: pop.name,
+          lat: pop.lat,
+          lng: pop.lng,
+          color: pop.color,
+          metadata: pop.metadata
+        }
+      end,
       nodes: network_map.map_nodes.order(:id).map do |node|
         {
-          id: node.id,
+          id: node.external_id || node.id,
+          pop_id: node.map_pop&.external_id || node.map_pop_id,
           label: node.label,
           node_kind: node.node_kind,
           x: node.x,
           y: node.y,
+          lat: node.lat,
+          lng: node.lng,
+          icon: node.icon,
+          color: node.color,
+          size: node.size,
           zabbix_ref: node.zabbix_ref,
           metadata: node.metadata
         }
       end,
       cables: network_map.network_cables.order(:id).map do |cable|
         {
-          id: cable.id,
-          source_node_id: cable.source_node_id,
-          target_node_id: cable.target_node_id,
+          id: cable.external_id || cable.id,
+          source_pop_id: cable.source_pop&.external_id || cable.source_pop_id,
+          target_pop_id: cable.target_pop&.external_id || cable.target_pop_id,
+          source_node_id: cable.source_node&.external_id || cable.source_node_id,
+          target_node_id: cable.target_node&.external_id || cable.target_node_id,
           label: cable.label,
           cable_type: cable.cable_type,
           status: cable.status,
           bandwidth_mbps: cable.bandwidth_mbps,
           length_meters: cable.length_meters,
+          color: cable.color,
+          weight: cable.weight,
+          pattern: cable.pattern,
           metadata: cable.metadata,
           points: cable.network_cable_points.order(:position).map do |point|
             {

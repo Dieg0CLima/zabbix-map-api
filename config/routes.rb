@@ -8,9 +8,17 @@ Rails.application.routes.draw do
 
       get "me", to: "me#show"
 
+      resources :projects, controller: "network_projects" do
+        member do
+          put :save
+        end
+      end
+
       resources :network_maps do
+        resources :map_pops
         resources :map_nodes
         resources :network_cables
+        resource :editor_state, controller: "network_map_editor_states", only: %i[show update]
       end
 
       resources :zabbix_connections do
