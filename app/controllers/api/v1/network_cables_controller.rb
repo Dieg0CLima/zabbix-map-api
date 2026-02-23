@@ -63,11 +63,17 @@ class Api::V1::NetworkCablesController < ApplicationController
 
   def network_cable_params
     params.require(:network_cable).permit(
+      :external_id,
+      :source_pop_id,
+      :target_pop_id,
       :source_node_id,
       :target_node_id,
       :label,
       :cable_type,
       :status,
+      :color,
+      :weight,
+      :pattern,
       :bandwidth_mbps,
       :length_meters,
       metadata: {}
@@ -80,7 +86,12 @@ class Api::V1::NetworkCablesController < ApplicationController
 
   def upsert_points!(cable)
     points_params.each do |point|
-      cable.network_cable_points.create!(point.permit(:position, :x, :y))
+      point_data = point.permit(:position, :x, :y, :lat, :lng)
+      cable.network_cable_points.create!(
+        position: point_data[:position],
+        x: point_data[:x] || point_data[:lat],
+        y: point_data[:y] || point_data[:lng]
+      )
     end
   end
 
@@ -93,13 +104,18 @@ class Api::V1::NetworkCablesController < ApplicationController
 
   def cable_payload(cable)
     {
-      id: cable.id,
+      id: cable.external_id || cable.id,
       network_map_id: cable.network_map_id,
+      source_pop_id: cable.source_pop_id,
+      target_pop_id: cable.target_pop_id,
       source_node_id: cable.source_node_id,
       target_node_id: cable.target_node_id,
       label: cable.label,
       cable_type: cable.cable_type,
       status: cable.status,
+      color: cable.color,
+      weight: cable.weight,
+      pattern: cable.pattern,
       bandwidth_mbps: cable.bandwidth_mbps,
       length_meters: cable.length_meters,
       metadata: cable.metadata,
@@ -108,7 +124,9 @@ class Api::V1::NetworkCablesController < ApplicationController
           id: point.id,
           position: point.position,
           x: point.x,
-          y: point.y
+          y: point.y,
+          lat: point.x,
+          lng: point.y
         }
       end
     }
