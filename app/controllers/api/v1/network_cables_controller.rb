@@ -106,8 +106,8 @@ class Api::V1::NetworkCablesController < ApplicationController
     {
       id: cable.external_id || cable.id,
       network_map_id: cable.network_map_id,
-      source_pop_id: cable.source_pop_id,
-      target_pop_id: cable.target_pop_id,
+      source_pop_id: cable.source_pop&.external_id || cable.source_pop_id,
+      target_pop_id: cable.target_pop&.external_id || cable.target_pop_id,
       source_node_id: cable.source_node_id,
       target_node_id: cable.target_node_id,
       label: cable.label,
