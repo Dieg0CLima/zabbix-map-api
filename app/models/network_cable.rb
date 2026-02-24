@@ -13,6 +13,7 @@ class NetworkCable < ApplicationRecord
 
   has_many :network_cable_points, dependent: :destroy
 
+  before_validation :resolve_pop_external_ids
   before_validation :apply_default_visuals
   before_validation :derive_pops_from_nodes
 
@@ -38,6 +39,30 @@ class NetworkCable < ApplicationRecord
   validate :at_least_one_endpoint_binding
   validate :endpoints_must_belong_to_the_same_map
   validate :nodes_must_match_bound_pops
+  validate :source_pop_external_id_must_exist
+  validate :target_pop_external_id_must_exist
+
+  def source_pop_id=(value)
+    @source_pop_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @source_pop_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
+
+  def target_pop_id=(value)
+    @target_pop_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @target_pop_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
 
   private
 
@@ -46,6 +71,18 @@ class NetworkCable < ApplicationRecord
     self.color ||= "#0891b2"
     self.weight ||= 4
     self.pattern ||= "solid"
+  end
+
+  def resolve_pop_external_ids
+    return if network_map.blank?
+
+    if @source_pop_external_id.present?
+      self.source_pop = network_map.map_pops.find_by(external_id: @source_pop_external_id)
+    end
+
+    if @target_pop_external_id.present?
+      self.target_pop = network_map.map_pops.find_by(external_id: @target_pop_external_id)
+    end
   end
 
   def derive_pops_from_nodes
@@ -80,5 +117,17 @@ class NetworkCable < ApplicationRecord
     if target_node.present? && target_pop.present? && target_node.map_pop_id != target_pop_id
       errors.add(:target_node, "must belong to target_pop")
     end
+  end
+
+  def source_pop_external_id_must_exist
+    return if @source_pop_external_id.blank? || source_pop.present?
+
+    errors.add(:source_pop_id, "must reference an existing pop external_id")
+  end
+
+  def target_pop_external_id_must_exist
+    return if @target_pop_external_id.blank? || target_pop.present?
+
+    errors.add(:target_pop_id, "must reference an existing pop external_id")
   end
 end

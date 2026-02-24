@@ -1,6 +1,8 @@
 class MapPop < ApplicationRecord
   belongs_to :network_map
 
+  before_validation :apply_defaults
+
   has_many :map_nodes, dependent: :nullify
 
   has_many :source_cables,
@@ -16,4 +18,10 @@ class MapPop < ApplicationRecord
 
   validates :name, :external_id, :lat, :lng, :color, presence: true
   validates :external_id, uniqueness: { scope: :network_map_id }
+
+  private
+
+  def apply_defaults
+    self.external_id ||= "pop-#{SecureRandom.uuid}"
+  end
 end

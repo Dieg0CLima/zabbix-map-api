@@ -4,6 +4,7 @@ class MapNode < ApplicationRecord
   belongs_to :network_map
   belongs_to :map_pop, optional: true
 
+  before_validation :resolve_map_pop_external_id
   before_validation :apply_default_visuals
 
   has_many :outgoing_cables,
@@ -25,6 +26,18 @@ class MapNode < ApplicationRecord
   validates :icon, :color, presence: true
 
   validate :pop_must_belong_to_same_map
+  validate :map_pop_external_id_must_exist
+
+  def map_pop_id=(value)
+    @map_pop_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @map_pop_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
 
   private
 
@@ -37,6 +50,18 @@ class MapNode < ApplicationRecord
     self.lng ||= y
     self.x ||= lat
     self.y ||= lng
+  end
+
+  def resolve_map_pop_external_id
+    return if @map_pop_external_id.blank? || network_map.blank?
+
+    self.map_pop = network_map.map_pops.find_by(external_id: @map_pop_external_id)
+  end
+
+  def map_pop_external_id_must_exist
+    return if @map_pop_external_id.blank? || map_pop.present?
+
+    errors.add(:map_pop_id, "must reference an existing pop external_id")
   end
 
   def pop_must_belong_to_same_map
