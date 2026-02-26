@@ -44,6 +44,12 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     assert_equal source_pop.external_id, payload["source_pop_id"]
     assert_nil payload["target_pop_id"]
     assert_equal 2, payload.fetch("points").size
+
+    created_cable = network_map.network_cables.find(payload["id"])
+    created_event = created_cable.network_cable_events.order(:id).last
+    assert_equal "created", created_event.event_type
+    assert_equal({}, created_event.before_state)
+    assert created_event.after_state.present?
   end
 
   test "create validates points minimum" do

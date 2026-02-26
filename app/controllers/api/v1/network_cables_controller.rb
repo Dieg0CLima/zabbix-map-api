@@ -92,7 +92,8 @@ class Api::V1::NetworkCablesController < ApplicationController
       :pattern,
       :bandwidth_mbps,
       :length_meters,
-      metadata: {}
+      metadata: {},
+      points: [:position, :x, :y, :lat, :lng]
     )
   end
 
@@ -212,8 +213,8 @@ class Api::V1::NetworkCablesController < ApplicationController
       event_type:,
       occurred_at: Time.current,
       actor: current_user.email,
-      before_state:,
-      after_state:,
+      before_state: before_state || {},
+      after_state: after_state || {},
       notes:
     )
   end
