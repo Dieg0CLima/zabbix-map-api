@@ -78,7 +78,15 @@ class Api::V1::NetworkCablesController < ApplicationController
   end
 
   def network_cable_params
-    params.require(:network_cable).permit(
+    permitted_network_cable_payload.except(:points)
+  end
+
+  def points_params
+    Array(permitted_network_cable_payload[:points])
+  end
+
+  def permitted_network_cable_payload
+    @permitted_network_cable_payload ||= params.require(:network_cable).permit(
       :external_id,
       :source_pop_id,
       :target_pop_id,
@@ -95,10 +103,6 @@ class Api::V1::NetworkCablesController < ApplicationController
       metadata: {},
       points: [:position, :x, :y, :lat, :lng]
     )
-  end
-
-  def points_params
-    Array(params.fetch(:network_cable, {}).fetch(:points, []))
   end
 
   def upsert_points!(cable)
