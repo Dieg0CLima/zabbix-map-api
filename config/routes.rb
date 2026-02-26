@@ -17,7 +17,9 @@ Rails.application.routes.draw do
       resources :network_maps do
         resources :map_pops
         resources :map_nodes
-        resources :network_cables
+        resources :network_cables do
+          resources :events, controller: "network_cable_events", only: :index
+        end
         resource :editor_state, controller: "network_map_editor_states", only: %i[show update]
       end
 

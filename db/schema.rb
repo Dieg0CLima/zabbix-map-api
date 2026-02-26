@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_26_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,9 +24,33 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
     t.string "zabbix_ref"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "external_id", null: false
+    t.string "icon", null: false
+    t.string "color", null: false
+    t.integer "size", null: false
+    t.decimal "lat", precision: 10, scale: 6, null: false
+    t.decimal "lng", precision: 10, scale: 6, null: false
+    t.bigint "map_pop_id"
+    t.index ["map_pop_id"], name: "index_map_nodes_on_map_pop_id"
+    t.index ["network_map_id", "external_id"], name: "index_map_nodes_on_network_map_id_and_external_id", unique: true
     t.index ["network_map_id", "node_kind"], name: "index_map_nodes_on_network_map_id_and_node_kind"
     t.index ["network_map_id", "zabbix_ref"], name: "index_map_nodes_on_network_map_id_and_zabbix_ref"
     t.index ["network_map_id"], name: "index_map_nodes_on_network_map_id"
+  end
+
+  create_table "map_pops", force: :cascade do |t|
+    t.bigint "network_map_id", null: false
+    t.string "name", null: false
+    t.string "external_id", null: false
+    t.decimal "lat", precision: 10, scale: 6, null: false
+    t.decimal "lng", precision: 10, scale: 6, null: false
+    t.string "color", default: "#7c3aed", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["network_map_id", "external_id"], name: "index_map_pops_on_network_map_id_and_external_id", unique: true
+    t.index ["network_map_id", "name"], name: "index_map_pops_on_network_map_id_and_name"
+    t.index ["network_map_id"], name: "index_map_pops_on_network_map_id"
   end
 
   create_table "memberships", force: :cascade do |t|
@@ -41,11 +65,28 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
     t.index ["user_id"], name: "index_memberships_on_user_id"
   end
 
+  create_table "network_cable_events", force: :cascade do |t|
+    t.bigint "network_map_id", null: false
+    t.bigint "network_cable_id"
+    t.string "event_type", null: false
+    t.datetime "occurred_at", null: false
+    t.string "actor"
+    t.jsonb "before_state", default: {}, null: false
+    t.jsonb "after_state", default: {}, null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["network_cable_id", "occurred_at"], name: "index_network_cable_events_on_network_cable_id_and_occurred_at"
+    t.index ["network_cable_id"], name: "index_network_cable_events_on_network_cable_id"
+    t.index ["network_map_id", "occurred_at"], name: "index_network_cable_events_on_network_map_id_and_occurred_at"
+    t.index ["network_map_id"], name: "index_network_cable_events_on_network_map_id"
+  end
+
   create_table "network_cable_points", force: :cascade do |t|
     t.bigint "network_cable_id", null: false
     t.integer "position", null: false
-    t.decimal "x", precision: 10, scale: 2, null: false
-    t.decimal "y", precision: 10, scale: 2, null: false
+    t.decimal "x", precision: 12, scale: 6, null: false
+    t.decimal "y", precision: 12, scale: 6, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["network_cable_id", "position"], name: "index_network_cable_points_on_network_cable_id_and_position", unique: true
@@ -54,8 +95,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
 
   create_table "network_cables", force: :cascade do |t|
     t.bigint "network_map_id", null: false
-    t.bigint "source_node_id", null: false
-    t.bigint "target_node_id", null: false
+    t.bigint "source_node_id"
+    t.bigint "target_node_id"
     t.string "label"
     t.string "cable_type", default: "logical", null: false
     t.string "status", default: "unknown", null: false
@@ -64,11 +105,29 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
     t.jsonb "metadata", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["network_map_id", "source_node_id", "target_node_id"], name: "index_network_cables_on_map_source_target", unique: true
+    t.string "external_id", null: false
+    t.string "color", null: false
+    t.integer "weight", null: false
+    t.string "pattern", default: "solid", null: false
+    t.bigint "source_pop_id"
+    t.bigint "target_pop_id"
+    t.index ["network_map_id", "external_id"], name: "index_network_cables_on_network_map_id_and_external_id", unique: true
+    t.index ["network_map_id", "source_node_id", "target_node_id"], name: "index_network_cables_on_map_source_target", unique: true, where: "((source_node_id IS NOT NULL) AND (target_node_id IS NOT NULL))"
     t.index ["network_map_id"], name: "index_network_cables_on_network_map_id"
     t.index ["source_node_id"], name: "index_network_cables_on_source_node_id"
+    t.index ["source_pop_id"], name: "index_network_cables_on_source_pop_id"
     t.index ["target_node_id"], name: "index_network_cables_on_target_node_id"
-    t.check_constraint "source_node_id <> target_node_id", name: "network_cables_source_target_diff"
+    t.index ["target_pop_id"], name: "index_network_cables_on_target_pop_id"
+  end
+
+  create_table "network_map_snapshots", force: :cascade do |t|
+    t.bigint "network_map_id", null: false
+    t.string "label", null: false
+    t.jsonb "state", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["network_map_id", "created_at"], name: "index_network_map_snapshots_on_network_map_id_and_created_at"
+    t.index ["network_map_id"], name: "index_network_map_snapshots_on_network_map_id"
   end
 
   create_table "network_maps", force: :cascade do |t|
@@ -80,6 +139,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "zabbix_connection_id"
+    t.string "active_base_layer", default: "standard", null: false
     t.index ["organization_id", "name"], name: "index_network_maps_on_organization_id_and_name", unique: true
     t.index ["organization_id", "zabbix_mapid"], name: "index_network_maps_on_organization_id_and_zabbix_mapid", unique: true
     t.index ["organization_id"], name: "index_network_maps_on_organization_id"
@@ -173,13 +233,20 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_18_190851) do
     t.index ["zabbix_host_id"], name: "index_zabbix_items_on_zabbix_host_id"
   end
 
+  add_foreign_key "map_nodes", "map_pops"
   add_foreign_key "map_nodes", "network_maps"
+  add_foreign_key "map_pops", "network_maps"
   add_foreign_key "memberships", "organizations"
   add_foreign_key "memberships", "users"
+  add_foreign_key "network_cable_events", "network_cables"
+  add_foreign_key "network_cable_events", "network_maps"
   add_foreign_key "network_cable_points", "network_cables"
   add_foreign_key "network_cables", "map_nodes", column: "source_node_id"
   add_foreign_key "network_cables", "map_nodes", column: "target_node_id"
+  add_foreign_key "network_cables", "map_pops", column: "source_pop_id"
+  add_foreign_key "network_cables", "map_pops", column: "target_pop_id"
   add_foreign_key "network_cables", "network_maps"
+  add_foreign_key "network_map_snapshots", "network_maps"
   add_foreign_key "network_maps", "organizations"
   add_foreign_key "network_maps", "zabbix_connections"
   add_foreign_key "zabbix_connections", "organizations"

@@ -51,4 +51,18 @@ class ApplicationController < ActionController::API
 
     render json: { error: "Insufficient permissions" }, status: :forbidden
   end
+
+  def render_validation_error(record_or_details, message: "Payload inválido")
+    details = if record_or_details.respond_to?(:errors)
+      record_or_details.errors.to_hash(true)
+    else
+      record_or_details
+    end
+
+    render json: {
+      code: "VALIDATION_ERROR",
+      message:,
+      details:
+    }, status: :unprocessable_entity
+  end
 end
