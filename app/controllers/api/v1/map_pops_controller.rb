@@ -20,7 +20,7 @@ class Api::V1::MapPopsController < ApplicationController
     if map_pop.save
       render json: { data: map_pop_payload(map_pop) }, status: :created
     else
-      render json: { errors: map_pop.errors.full_messages }, status: :unprocessable_entity
+      render_validation_error(map_pop)
     end
   end
 
@@ -28,13 +28,16 @@ class Api::V1::MapPopsController < ApplicationController
     if @map_pop.update(map_pop_params)
       render json: { data: map_pop_payload(@map_pop) }, status: :ok
     else
-      render json: { errors: @map_pop.errors.full_messages }, status: :unprocessable_entity
+      render_validation_error(@map_pop)
     end
   end
 
   def destroy
-    @map_pop.destroy
-    head :no_content
+    if @map_pop.destroy
+      head :no_content
+    else
+      render_validation_error(@map_pop, message: "Não foi possível remover o POP")
+    end
   end
 
   private

@@ -74,8 +74,8 @@ class NetworkMaps::PersistEditorState
       record = @network_map.network_cables.create!(
         external_id: cable[:id],
         label: cable[:label],
-        cable_type: cable[:cable_type] || "logical",
-        status: cable[:status] || "unknown",
+        cable_type: cable[:cable_type] || "manual",
+        status: cable[:status] || "planned",
         color: cable[:color],
         weight: cable[:weight],
         pattern: cable[:pattern],

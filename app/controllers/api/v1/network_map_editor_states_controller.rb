@@ -13,7 +13,7 @@ class Api::V1::NetworkMapEditorStatesController < ApplicationController
 
     render json: { data: editor_payload(network_map) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    render_validation_error(e.record)
   end
 
   private
@@ -42,9 +42,15 @@ class Api::V1::NetworkMapEditorStatesController < ApplicationController
   end
 
   def editor_payload(network_map)
+    latest_snapshot = network_map.network_map_snapshots.order(created_at: :desc).first
+    latest_state = latest_snapshot&.state || {}
+
     {
       network_map_id: network_map.id,
       active_base_layer: network_map.active_base_layer,
+      history_label: latest_snapshot&.label,
+      history_index: latest_state["history_index"],
+      draft_cable: latest_state["draft_cable"],
       pops: network_map.map_pops.order(:id).map do |pop|
         {
           id: pop.external_id,

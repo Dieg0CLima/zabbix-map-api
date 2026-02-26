@@ -1,5 +1,5 @@
 class MapNode < ApplicationRecord
-  NODE_KINDS = %w[switch router server firewall gateway endpoint text zabbix_host].freeze
+  NODE_KINDS = %w[switch router server firewall gateway endpoint text zabbix_host olt cto splitter].freeze
 
   belongs_to :network_map
   belongs_to :map_pop, optional: true

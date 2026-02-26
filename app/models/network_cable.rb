@@ -1,6 +1,6 @@
 class NetworkCable < ApplicationRecord
-  CABLE_TYPES = %w[copper fiber wireless logical].freeze
-  STATUSES = %w[up down degraded unknown].freeze
+  CABLE_TYPES = %w[manual feeder distribution drop copper fiber wireless logical].freeze
+  STATUSES = %w[active planned maintenance disabled up down degraded unknown].freeze
   PATTERNS = %w[solid dashed dotted].freeze
 
   belongs_to :network_map
@@ -12,6 +12,7 @@ class NetworkCable < ApplicationRecord
   belongs_to :target_node, class_name: "MapNode", inverse_of: :incoming_cables, optional: true
 
   has_many :network_cable_points, dependent: :destroy
+  has_many :network_cable_events, dependent: :destroy
 
   before_validation :resolve_pop_external_ids
   before_validation :apply_default_visuals
@@ -25,7 +26,7 @@ class NetworkCable < ApplicationRecord
   validates :cable_type, inclusion: { in: CABLE_TYPES }
   validates :status, inclusion: { in: STATUSES }
   validates :source_node_id, uniqueness: {
-    scope: [ :target_node_id, :network_map_id ],
+    scope: [:target_node_id, :network_map_id],
     message: "already has a cable in this map"
   }, if: -> { source_node_id.present? && target_node_id.present? }
   validates :source_node_id,
@@ -36,11 +37,12 @@ class NetworkCable < ApplicationRecord
   validates :length_meters,
             numericality: { greater_than_or_equal_to: 0, allow_nil: true }
 
-  validate :at_least_one_endpoint_binding
+  validate :source_binding_required
   validate :endpoints_must_belong_to_the_same_map
   validate :nodes_must_match_bound_pops
   validate :source_pop_external_id_must_exist
   validate :target_pop_external_id_must_exist
+  validate :fiber_count_must_be_positive_integer
 
   def source_pop_id=(value)
     @source_pop_external_id = nil
@@ -71,6 +73,8 @@ class NetworkCable < ApplicationRecord
     self.color ||= "#0891b2"
     self.weight ||= 4
     self.pattern ||= "solid"
+    self.cable_type ||= "manual"
+    self.status ||= "planned"
   end
 
   def resolve_pop_external_ids
@@ -90,18 +94,16 @@ class NetworkCable < ApplicationRecord
     self.target_pop ||= target_node&.map_pop
   end
 
-  def at_least_one_endpoint_binding
-    valid_source = source_pop_id.present? || source_node_id.present?
-    valid_target = target_pop_id.present? || target_node_id.present?
-    return if valid_source && valid_target
+  def source_binding_required
+    return if source_pop_id.present? || source_node_id.present?
 
-    errors.add(:base, "cable must be bound to source and target by pop or equipment")
+    errors.add(:source_pop_id, "é obrigatório")
   end
 
   def endpoints_must_belong_to_the_same_map
     return if network_map.blank?
 
-    [ source_pop, target_pop, source_node, target_node ].compact.each do |record|
+    [source_pop, target_pop, source_node, target_node].compact.each do |record|
       next if record.network_map_id == network_map_id
 
       errors.add(:base, "all endpoints must belong to the same network map")
@@ -129,5 +131,14 @@ class NetworkCable < ApplicationRecord
     return if @target_pop_external_id.blank? || target_pop.present?
 
     errors.add(:target_pop_id, "must reference an existing pop external_id")
+  end
+
+  def fiber_count_must_be_positive_integer
+    return unless metadata.is_a?(Hash) && metadata.key?("fiber_count")
+
+    fiber_count = metadata["fiber_count"]
+    return if fiber_count.is_a?(Integer) && fiber_count.positive?
+
+    errors.add(:metadata, "fiber_count deve ser inteiro positivo")
   end
 end
