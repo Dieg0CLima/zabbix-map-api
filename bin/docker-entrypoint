@@ -2,13 +2,25 @@
 
 # Enable jemalloc for reduced memory usage and latency.
 if [ -z "${LD_PRELOAD+x}" ]; then
-    LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
-    export LD_PRELOAD
+  LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
+  export LD_PRELOAD
 fi
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|True|yes|YES|y|Y|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
+
+  # ✅ Optional seeds (set RUN_DB_SEED=1 or true)
+  if is_truthy "${RUN_DB_SEED:-}"; then
+    ./bin/rails db:seed
+  fi
 fi
 
 exec "${@}"
