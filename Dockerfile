@@ -12,7 +12,9 @@ RUN apt-get update -qq && \
       libjemalloc2 \
       libpq5 \
       libvips \
-      postgresql-client && \
+      postgresql-client \
+      # ✅ runtime lib for mysql2 (client library)
+      libmariadb3 && \
     rm -rf /var/lib/apt/lists/*
 
 ENV RAILS_ENV=production \
@@ -28,10 +30,16 @@ RUN apt-get update -qq && \
       git \
       libpq-dev \
       libyaml-dev \
-      pkg-config && \
+      pkg-config \
+      # ✅ headers/tooling to compile mysql2
+      libmariadb-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY Gemfile Gemfile.lock ./
+
+# ✅ help bundler find mariadb_config (safe even if not needed)
+RUN bundle config set --local build.mysql2 "--with-mysql-config=/usr/bin/mariadb_config" || true
+
 RUN bundle install && \
     rm -rf ~/.bundle/ \
       "${BUNDLE_PATH}"/ruby/*/cache \
