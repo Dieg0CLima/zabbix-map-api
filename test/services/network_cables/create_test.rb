@@ -29,7 +29,7 @@ class NetworkCables::CreateTest < ActiveSupport::TestCase
     organization = Organization.create!(name: "Org Cable Service 2")
     network_map = organization.network_maps.create!(name: "Mapa Service 2", source_type: "manual")
 
-    error = assert_raises(ActiveRecord::RecordInvalid) do
+    error = assert_raises(NetworkCables::Errors::InvalidPoints) do
       NetworkCables::Create.new(
         network_map:,
         payload: { points: [{ position: 0, lat: -23.11, lng: -46.11 }] },
@@ -37,6 +37,6 @@ class NetworkCables::CreateTest < ActiveSupport::TestCase
       ).call
     end
 
-    assert_includes error.record.errors[:points], "É necessário ao menos 2 pontos"
+    assert_equal({ points: ["É necessário ao menos 2 pontos"] }, error.details)
   end
 end

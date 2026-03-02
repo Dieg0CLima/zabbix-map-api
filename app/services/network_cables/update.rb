@@ -18,7 +18,7 @@ class NetworkCables::Update
       after_state = event_state_for(@cable)
       record_event!(
         @cable,
-        event_type: infer_event_type(before_state, after_state),
+        event_type: NetworkCables::EventTypeInferer.call(before_state:, after_state:),
         before_state:,
         after_state:,
         notes: "Cabo atualizado"
@@ -31,29 +31,14 @@ class NetworkCables::Update
   private
 
   def replace_points!
-    points = Array(@payload[:points])
-    if points.length < 2
-      @cable.errors.add(:points, "É necessário ao menos 2 pontos")
-      raise ActiveRecord::RecordInvalid, @cable
-    end
+    NetworkCables::PointSetValidator.validate!(@payload[:points])
+    points = NetworkCables::PointNormalizer.normalize_set(@payload[:points])
 
     @cable.network_cable_points.destroy_all
 
     points.each do |point|
-      @cable.network_cable_points.create!(
-        position: point[:position],
-        x: point[:x] || point[:lat],
-        y: point[:y] || point[:lng]
-      )
+      @cable.network_cable_points.create!(point)
     end
-  end
-
-  def infer_event_type(before_state, after_state)
-    return "status_changed" if before_state[:status] != after_state[:status]
-    return "geometry_changed" if before_state[:points] != after_state[:points]
-    return "metadata_updated" if before_state[:metadata] != after_state[:metadata]
-
-    "updated"
   end
 
   def event_state_for(cable)

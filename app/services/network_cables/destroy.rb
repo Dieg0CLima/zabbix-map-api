@@ -8,7 +8,7 @@ class NetworkCables::Destroy
   def call
     record_event!(
       @cable,
-      event_type: "deactivated",
+      event_type: "deleted",
       before_state: event_state_for(@cable),
       notes: "Cabo removido"
     )

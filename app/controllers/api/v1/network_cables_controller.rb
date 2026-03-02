@@ -25,6 +25,8 @@ class Api::V1::NetworkCablesController < ApplicationController
     render json: { data: cable_payload(cable) }, status: :created
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record)
+  rescue NetworkCables::Errors::DomainError => e
+    render_validation_error(e.details, message: e.message)
   end
 
   def update
@@ -39,6 +41,8 @@ class Api::V1::NetworkCablesController < ApplicationController
     render json: { data: cable_payload(cable) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record)
+  rescue NetworkCables::Errors::DomainError => e
+    render_validation_error(e.details, message: e.message)
   end
 
   def destroy

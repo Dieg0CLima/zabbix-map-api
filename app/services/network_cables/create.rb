@@ -6,12 +6,14 @@ class NetworkCables::Create
   end
 
   def call
-    validate_points!(@payload[:points])
+    NetworkCables::PointSetValidator.validate!(@payload[:points])
+
     cable = @network_map.network_cables.new(@payload.except(:points))
+    points = NetworkCables::PointNormalizer.normalize_set(@payload[:points])
 
     ActiveRecord::Base.transaction do
       cable.save!
-      create_points!(cable, @payload[:points])
+      create_points!(cable, points)
       record_event!(cable, event_type: "created", after_state: event_state_for(cable), notes: "Cabo criado")
     end
 
@@ -20,19 +22,9 @@ class NetworkCables::Create
 
   private
 
-  def validate_points!(points)
-    return if Array(points).length >= 2
-
-    raise ActiveRecord::RecordInvalid.new(build_error_record(points: "É necessário ao menos 2 pontos"))
-  end
-
   def create_points!(cable, points)
-    Array(points).each do |point|
-      cable.network_cable_points.create!(
-        position: point[:position],
-        x: point[:x] || point[:lat],
-        y: point[:y] || point[:lng]
-      )
+    points.each do |point|
+      cable.network_cable_points.create!(point)
     end
   end
 
@@ -56,11 +48,5 @@ class NetworkCables::Create
       after_state: after_state || {},
       notes:
     )
-  end
-
-  def build_error_record(details)
-    NetworkCable.new.tap do |record|
-      details.each { |field, message| record.errors.add(field, message) }
-    end
   end
 end
