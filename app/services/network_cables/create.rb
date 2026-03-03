@@ -2,7 +2,7 @@ class NetworkCables::Create
   def initialize(network_map:, payload:, actor_email:)
     @network_map = network_map
     @payload = payload
-    @actor_email = actor_email
+    @event_recorder = NetworkCables::EventRecorder.new(network_map:, actor_email:)
   end
 
   def call
@@ -14,7 +14,12 @@ class NetworkCables::Create
     ActiveRecord::Base.transaction do
       cable.save!
       create_points!(cable, points)
-      record_event!(cable, event_type: "created", after_state: event_state_for(cable), notes: "Cabo criado")
+      @event_recorder.record!(
+        cable:,
+        event_type: "created",
+        after_state: NetworkCables::EventStateBuilder.call(cable:),
+        notes: "Cabo criado"
+      )
     end
 
     cable.reload
@@ -26,27 +31,5 @@ class NetworkCables::Create
     points.each do |point|
       cable.network_cable_points.create!(point)
     end
-  end
-
-  def event_state_for(cable)
-    {
-      label: cable.label,
-      status: cable.status,
-      cable_type: cable.cable_type,
-      metadata: cable.metadata,
-      points: cable.network_cable_points.order(:position).pluck(:position, :x, :y)
-    }
-  end
-
-  def record_event!(cable, event_type:, before_state: nil, after_state: nil, notes: nil)
-    cable.network_cable_events.create!(
-      network_map: @network_map,
-      event_type:,
-      occurred_at: Time.current,
-      actor: @actor_email,
-      before_state: before_state || {},
-      after_state: after_state || {},
-      notes:
-    )
   end
 end
