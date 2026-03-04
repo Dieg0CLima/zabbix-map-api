@@ -21,13 +21,11 @@ class Api::V1::NetworkMapEditorStatesController < ApplicationController
   private
 
   def set_network_map
-    maps_scope = if admin_without_organization_context?
-      NetworkMap
-    else
-      current_organization.network_maps
-    end
+    @network_map = network_maps_scope.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points).find(params[:network_map_id])
+  end
 
-    @network_map = maps_scope.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points).find(params[:network_map_id])
+  def network_maps_scope
+    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
   end
 
   def editor_payload(network_map)

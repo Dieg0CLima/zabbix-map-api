@@ -6,11 +6,7 @@ class Api::V1::NetworkProjectsController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy save]
 
   def index
-    projects = if admin_without_organization_context?
-      NetworkMap.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
-    else
-      current_organization.network_maps.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
-    end
+    projects = network_projects_scope.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
 
     render json: { data: projects.map { |project| project_payload(project) } }, status: :ok
   end
@@ -22,28 +18,26 @@ class Api::V1::NetworkProjectsController < ApplicationController
   def create
     return if ensure_organization_context_for_creation!
 
-    project = current_organization.network_maps.new(project_params)
+    project = current_organization.network_maps.create!(permitted_project_payload.to_h)
 
-    if project.save
-      render json: { data: project_payload(project) }, status: :created
-    else
-      render json: { errors: project.errors.full_messages }, status: :unprocessable_entity
-    end
+    render json: { data: project_payload(project) }, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render_validation_error(e.record)
   end
 
   def update
-    if @project.update(project_params)
-      render json: { data: project_payload(@project) }, status: :ok
-    else
-      render json: { errors: @project.errors.full_messages }, status: :unprocessable_entity
-    end
+    @project.update!(permitted_project_payload.to_h)
+
+    render json: { data: project_payload(@project) }, status: :ok
+  rescue ActiveRecord::RecordInvalid => e
+    render_validation_error(e.record)
   end
 
   def save
     project = NetworkMaps::PersistEditorState.new(network_map: @project, payload: editor_state_params).call
     render json: { data: project_payload(project) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    render_validation_error(e.record)
   end
 
   def destroy
@@ -54,69 +48,18 @@ class Api::V1::NetworkProjectsController < ApplicationController
   private
 
   def set_project
-    projects_scope = if admin_without_organization_context?
-      NetworkMap
-    else
-      current_organization.network_maps
-    end
-
-    @project = projects_scope.find(params[:id])
+    @project = network_projects_scope.find(params[:id])
   end
 
-  def project_params
+  def network_projects_scope
+    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
+  end
+
+  def permitted_project_payload
     params.require(:project).permit(:name, :description, :source_type, :zabbix_mapid, :zabbix_connection_id, :active_base_layer)
   end
 
   def project_payload(project)
-    {
-      id: project.id,
-      organization_id: project.organization_id,
-      name: project.name,
-      description: project.description,
-      active_base_layer: project.active_base_layer,
-      pops: project.map_pops.order(:id).map do |pop|
-        {
-          id: pop.external_id,
-          name: pop.name,
-          lat: pop.lat,
-          lng: pop.lng,
-          color: pop.color,
-          metadata: pop.metadata
-        }
-      end,
-      nodes: project.map_nodes.order(:id).map do |node|
-        {
-          id: node.external_id,
-          pop_id: node.map_pop&.external_id,
-          label: node.label,
-          node_kind: node.node_kind,
-          lat: node.lat,
-          lng: node.lng,
-          icon: node.icon,
-          color: node.color,
-          size: node.size,
-          metadata: node.metadata
-        }
-      end,
-      cables: project.network_cables.order(:id).map do |cable|
-        {
-          id: cable.external_id,
-          source_pop_id: cable.source_pop&.external_id,
-          target_pop_id: cable.target_pop&.external_id,
-          source_node_id: cable.source_node&.external_id,
-          target_node_id: cable.target_node&.external_id,
-          color: cable.color,
-          weight: cable.weight,
-          pattern: cable.pattern,
-          points: cable.network_cable_points.order(:position).map do |point|
-            {
-              position: point.position,
-              lat: point.x,
-              lng: point.y
-            }
-          end
-        }
-      end
-    }
+    NetworkProjects::PayloadBuilder.new(project:).call
   end
 end

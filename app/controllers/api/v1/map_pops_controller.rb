@@ -15,21 +15,19 @@ class Api::V1::MapPopsController < ApplicationController
   end
 
   def create
-    map_pop = @network_map.map_pops.new(map_pop_params)
+    map_pop = @network_map.map_pops.create!(permitted_map_pop_payload.to_h)
 
-    if map_pop.save
-      render json: { data: map_pop_payload(map_pop) }, status: :created
-    else
-      render_validation_error(map_pop)
-    end
+    render json: { data: map_pop_payload(map_pop) }, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render_validation_error(e.record)
   end
 
   def update
-    if @map_pop.update(map_pop_params)
-      render json: { data: map_pop_payload(@map_pop) }, status: :ok
-    else
-      render_validation_error(@map_pop)
-    end
+    @map_pop.update!(permitted_map_pop_payload.to_h)
+
+    render json: { data: map_pop_payload(@map_pop) }, status: :ok
+  rescue ActiveRecord::RecordInvalid => e
+    render_validation_error(e.record)
   end
 
   def destroy
@@ -43,13 +41,11 @@ class Api::V1::MapPopsController < ApplicationController
   private
 
   def set_network_map
-    maps_scope = if admin_without_organization_context?
-      NetworkMap
-    else
-      current_organization.network_maps
-    end
+    @network_map = network_maps_scope.find(params[:network_map_id])
+  end
 
-    @network_map = maps_scope.find(params[:network_map_id])
+  def network_maps_scope
+    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
   end
 
   def set_map_pop
@@ -60,22 +56,11 @@ class Api::V1::MapPopsController < ApplicationController
     raise ActiveRecord::RecordNotFound if @map_pop.blank?
   end
 
-  def map_pop_params
+  def permitted_map_pop_payload
     params.require(:map_pop).permit(:name, :external_id, :lat, :lng, :color, metadata: {})
   end
 
   def map_pop_payload(pop)
-    {
-      id: pop.external_id || pop.id,
-      network_map_id: pop.network_map_id,
-      name: pop.name,
-      external_id: pop.external_id,
-      lat: pop.lat,
-      lng: pop.lng,
-      color: pop.color,
-      metadata: pop.metadata,
-      created_at: pop.created_at,
-      updated_at: pop.updated_at
-    }
+    MapPops::PayloadBuilder.new(pop:).call
   end
 end
