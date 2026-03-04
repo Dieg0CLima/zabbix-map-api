@@ -15,7 +15,10 @@ class Api::V1::MapPopsController < ApplicationController
   end
 
   def create
-    map_pop = @network_map.map_pops.create!(permitted_map_pop_payload.to_h)
+    map_pop = MapPops::Create.new(
+      network_map: @network_map,
+      payload: permitted_map_pop_payload.to_h
+    ).call
 
     render json: { data: map_pop_payload(map_pop) }, status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -23,7 +26,10 @@ class Api::V1::MapPopsController < ApplicationController
   end
 
   def update
-    @map_pop.update!(permitted_map_pop_payload.to_h)
+    MapPops::Update.new(
+      map_pop: @map_pop,
+      payload: permitted_map_pop_payload.to_h
+    ).call
 
     render json: { data: map_pop_payload(@map_pop) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
@@ -31,11 +37,11 @@ class Api::V1::MapPopsController < ApplicationController
   end
 
   def destroy
-    if @map_pop.destroy
-      head :no_content
-    else
-      render_validation_error(@map_pop, message: "Não foi possível remover o POP")
-    end
+    MapPops::Destroy.new(map_pop: @map_pop).call
+
+    head :no_content
+  rescue ActiveRecord::RecordNotDestroyed => e
+    render_validation_error(e.record, message: "Não foi possível remover o POP")
   end
 
   private

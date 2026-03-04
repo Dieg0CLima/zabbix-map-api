@@ -18,7 +18,10 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   def create
     return if ensure_organization_context_for_creation!
 
-    connection = current_organization.zabbix_connections.create!(zabbix_connection_params)
+    connection = ZabbixConnections::Create.new(
+      organization: current_organization,
+      payload: zabbix_connection_params
+    ).call
 
     render json: { data: connection_payload(connection) }, status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -26,7 +29,10 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def update
-    @zabbix_connection.update!(zabbix_connection_params)
+    ZabbixConnections::Update.new(
+      connection: @zabbix_connection,
+      payload: zabbix_connection_params
+    ).call
 
     render json: { data: connection_payload(@zabbix_connection) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
@@ -34,7 +40,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def destroy
-    @zabbix_connection.destroy
+    ZabbixConnections::Destroy.new(connection: @zabbix_connection).call
     head :no_content
   end
 
@@ -69,12 +75,6 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
     attrs.delete(:db_password) if attrs[:db_password].to_s.strip.empty?
     attrs.delete(:api_token) if attrs[:api_token].to_s.strip.empty?
     attrs
-  end
-
-  def assign_db_password(connection)
-    return unless params.dig(:zabbix_connection, :db_password).present?
-
-    connection.db_password = params.dig(:zabbix_connection, :db_password)
   end
 
   def connection_payload(connection)

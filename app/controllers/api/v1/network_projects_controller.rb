@@ -18,7 +18,10 @@ class Api::V1::NetworkProjectsController < ApplicationController
   def create
     return if ensure_organization_context_for_creation!
 
-    project = current_organization.network_maps.create!(permitted_project_payload.to_h)
+    project = NetworkProjects::Create.new(
+      organization: current_organization,
+      payload: permitted_project_payload.to_h
+    ).call
 
     render json: { data: project_payload(project) }, status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -26,7 +29,10 @@ class Api::V1::NetworkProjectsController < ApplicationController
   end
 
   def update
-    @project.update!(permitted_project_payload.to_h)
+    NetworkProjects::Update.new(
+      project: @project,
+      payload: permitted_project_payload.to_h
+    ).call
 
     render json: { data: project_payload(@project) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
@@ -41,7 +47,7 @@ class Api::V1::NetworkProjectsController < ApplicationController
   end
 
   def destroy
-    @project.destroy
+    NetworkProjects::Destroy.new(project: @project).call
     head :no_content
   end
 

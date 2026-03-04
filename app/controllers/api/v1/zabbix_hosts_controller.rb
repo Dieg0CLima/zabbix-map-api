@@ -4,7 +4,9 @@ class Api::V1::ZabbixHostsController < ApplicationController
   before_action :set_zabbix_connection
 
   def index
-    render json: { data: fetched_data }, status: :ok
+    hosts = ZabbixHosts::Fetch.new(connection: @zabbix_connection, limit: params[:limit]).call
+
+    render json: { data: hosts }, status: :ok
   rescue Zabbix::DatabaseHostsFetcher::UnsupportedAdapterError => e
     render json: { error: e.message }, status: :unprocessable_entity
   rescue Zabbix::DatabaseHostsFetcher::Error => e
@@ -21,9 +23,4 @@ class Api::V1::ZabbixHostsController < ApplicationController
     admin_without_organization_context? ? ZabbixConnection : current_organization.zabbix_connections
   end
 
-  def fetched_data
-    return @zabbix_connection.zabbix_hosts.order(:id) unless @zabbix_connection.db_enabled?
-
-    Zabbix::DatabaseHostsFetcher.new(connection: @zabbix_connection, limit: params[:limit]).call
-  end
 end

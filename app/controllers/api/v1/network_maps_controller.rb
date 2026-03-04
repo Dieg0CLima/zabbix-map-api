@@ -17,7 +17,10 @@ class Api::V1::NetworkMapsController < ApplicationController
   def create
     return if ensure_organization_context_for_creation!
 
-    network_map = current_organization.network_maps.create!(permitted_network_map_payload.to_h)
+    network_map = NetworkMaps::Create.new(
+      organization: current_organization,
+      payload: permitted_network_map_payload.to_h
+    ).call
 
     render json: { data: network_map_payload(network_map) }, status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -25,7 +28,10 @@ class Api::V1::NetworkMapsController < ApplicationController
   end
 
   def update
-    @network_map.update!(permitted_network_map_payload.to_h)
+    NetworkMaps::Update.new(
+      network_map: @network_map,
+      payload: permitted_network_map_payload.to_h
+    ).call
 
     render json: { data: network_map_payload(@network_map) }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
@@ -33,7 +39,7 @@ class Api::V1::NetworkMapsController < ApplicationController
   end
 
   def destroy
-    @network_map.destroy
+    NetworkMaps::Destroy.new(network_map: @network_map).call
 
     head :no_content
   end
