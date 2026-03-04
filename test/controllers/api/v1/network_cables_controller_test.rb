@@ -81,6 +81,8 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     }, as: :json
 
     assert_response :unprocessable_entity
-    assert_equal "VALIDATION_ERROR", response.parsed_body["code"]
+    error = response.parsed_body.fetch("error")
+    assert_equal "invalid_points", error["code"]
+    assert_equal 2, error.dig("details", "min_points")
   end
 end
