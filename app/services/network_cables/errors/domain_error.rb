@@ -1,7 +1,8 @@
 class NetworkCables::Errors::DomainError < StandardError
-  attr_reader :details
+  attr_reader :code, :details
 
-  def initialize(message: "Payload inválido", details: {})
+  def initialize(code:, message:, details: {})
+    @code = code
     @details = details
     super(message)
   end

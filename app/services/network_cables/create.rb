@@ -9,7 +9,7 @@ class NetworkCables::Create
     NetworkCables::PointSetValidator.validate!(@payload[:points])
 
     cable = @network_map.network_cables.new(@payload.except(:points))
-    points = NetworkCables::PointNormalizer.normalize_set(@payload[:points])
+    points = NetworkCables::PointNormalizer.normalize(@payload[:points])
 
     ActiveRecord::Base.transaction do
       cable.save!

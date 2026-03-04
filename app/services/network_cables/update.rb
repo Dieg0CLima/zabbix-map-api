@@ -7,19 +7,23 @@ class NetworkCables::Update
   end
 
   def call
-    before_state = NetworkCables::EventStateBuilder.call(cable: @cable)
+    previous_state = NetworkCables::EventStateBuilder.call(cable: @cable)
+    points_changed = false
 
     ActiveRecord::Base.transaction do
       @cable.update!(@payload.except(:points))
-      replace_points! if @points_provided
-      @cable.reload
 
-      after_state = NetworkCables::EventStateBuilder.call(cable: @cable)
+      if @points_provided
+        points_changed = replace_points!
+        @cable.reload
+      end
+
+      current_state = NetworkCables::EventStateBuilder.call(cable: @cable)
       @event_recorder.record!(
         cable: @cable,
-        event_type: NetworkCables::EventTypeInferer.call(before_state:, after_state:),
-        before_state:,
-        after_state:,
+        event_type: NetworkCables::EventTypeInferer.infer(previous_state:, current_state:, points_changed:),
+        before_state: previous_state,
+        after_state: current_state,
         notes: "Cabo atualizado"
       )
     end
@@ -31,9 +35,14 @@ class NetworkCables::Update
 
   def replace_points!
     NetworkCables::PointSetValidator.validate!(@payload[:points])
-    points = NetworkCables::PointNormalizer.normalize_set(@payload[:points])
+    normalized_points = NetworkCables::PointNormalizer.normalize(@payload[:points])
+    previous_points = NetworkCables::PointNormalizer.normalize(
+      @cable.network_cable_points.order(:position).map { |point| { position: point.position, x: point.x, y: point.y } }
+    )
 
     @cable.network_cable_points.destroy_all
-    points.each { |point| @cable.network_cable_points.create!(point) }
+    normalized_points.each { |point| @cable.network_cable_points.create!(point) }
+
+    previous_points != normalized_points
   end
 end

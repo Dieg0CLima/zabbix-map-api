@@ -1,5 +1,13 @@
 class NetworkCables::Errors::InvalidPoints < NetworkCables::Errors::DomainError
-  def initialize
-    super(message: "Payload inválido", details: { points: ["É necessário ao menos 2 pontos"] })
+  def initialize(provided_points:, reason:)
+    super(
+      code: "invalid_points",
+      message: "Points payload is invalid",
+      details: {
+        min_points: 2,
+        provided_points:,
+        reason:
+      }
+    )
   end
 end

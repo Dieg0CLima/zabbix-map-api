@@ -25,7 +25,7 @@ class NetworkCables::CreateTest < ActiveSupport::TestCase
     assert_equal "created", cable.network_cable_events.last.event_type
   end
 
-  test "validates minimum points" do
+  test "raises InvalidPoints with structured details" do
     organization = Organization.create!(name: "Org Cable Service 2")
     network_map = organization.network_maps.create!(name: "Mapa Service 2", source_type: "manual")
 
@@ -37,6 +37,9 @@ class NetworkCables::CreateTest < ActiveSupport::TestCase
       ).call
     end
 
-    assert_equal({ points: ["É necessário ao menos 2 pontos"] }, error.details)
+    assert_equal "invalid_points", error.code
+    assert_equal 2, error.details[:min_points]
+    assert_equal 1, error.details[:provided_points]
+    assert_equal "too_few_points", error.details[:reason]
   end
 end

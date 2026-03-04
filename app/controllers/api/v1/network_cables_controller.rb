@@ -26,7 +26,7 @@ class Api::V1::NetworkCablesController < ApplicationController
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record)
   rescue NetworkCables::Errors::DomainError => e
-    render_validation_error(e.details, message: e.message)
+    render_domain_error(e)
   end
 
   def update
@@ -42,7 +42,7 @@ class Api::V1::NetworkCablesController < ApplicationController
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record)
   rescue NetworkCables::Errors::DomainError => e
-    render_validation_error(e.details, message: e.message)
+    render_domain_error(e)
   end
 
   def destroy
@@ -52,6 +52,17 @@ class Api::V1::NetworkCablesController < ApplicationController
   end
 
   private
+
+
+  def render_domain_error(error)
+    render json: {
+      error: {
+        code: error.code,
+        message: error.message,
+        details: error.details
+      }
+    }, status: :unprocessable_entity
+  end
 
   def set_network_map
     maps_scope = if admin_without_organization_context?
