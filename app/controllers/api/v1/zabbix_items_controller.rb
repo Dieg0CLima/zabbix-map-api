@@ -4,17 +4,12 @@ class Api::V1::ZabbixItemsController < ApplicationController
   before_action :set_zabbix_connection
 
   def index
-    items = if @zabbix_connection.db_enabled?
-      Zabbix::DatabaseItemsFetcher.new(
-        connection: @zabbix_connection,
-        hostid: params[:hostid],
-        limit: params[:limit]
-      ).call
-    else
-      scoped_items = @zabbix_connection.zabbix_items.order(:id)
-      scoped_items = scoped_items.where(zabbix_host_id: params[:zabbix_host_id]) if params[:zabbix_host_id].present?
-      scoped_items
-    end
+    items = ZabbixItems::Fetch.new(
+      connection: @zabbix_connection,
+      hostid: params[:hostid],
+      zabbix_host_id: params[:zabbix_host_id],
+      limit: params[:limit]
+    ).call
 
     render json: { data: items }, status: :ok
   rescue Zabbix::DatabaseItemsFetcher::UnsupportedAdapterError => e
@@ -26,12 +21,11 @@ class Api::V1::ZabbixItemsController < ApplicationController
   private
 
   def set_zabbix_connection
-    connections_scope = if admin_without_organization_context?
-      ZabbixConnection
-    else
-      current_organization.zabbix_connections
-    end
-
-    @zabbix_connection = connections_scope.find(params[:zabbix_connection_id])
+    @zabbix_connection = zabbix_connections_scope.find(params[:zabbix_connection_id])
   end
+
+  def zabbix_connections_scope
+    admin_without_organization_context? ? ZabbixConnection : current_organization.zabbix_connections
+  end
+
 end
