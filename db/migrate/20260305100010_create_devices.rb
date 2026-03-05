@@ -15,6 +15,5 @@ class CreateDevices < ActiveRecord::Migration[8.0]
 
     add_index :devices, [:organization_id, :external_id], unique: true
     add_index :devices, [:organization_id, :zabbix_ref]
-    add_index :devices, :site_id
   end
 end

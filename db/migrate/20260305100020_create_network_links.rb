@@ -19,9 +19,5 @@ class CreateNetworkLinks < ActiveRecord::Migration[8.0]
 
     add_index :network_links, [:organization_id, :external_id], unique: true
     add_index :network_links, [:organization_id, :zabbix_item_ref]
-    add_index :network_links, :source_device_id
-    add_index :network_links, :target_device_id
-    add_index :network_links, :source_site_id
-    add_index :network_links, :target_site_id
   end
 end
