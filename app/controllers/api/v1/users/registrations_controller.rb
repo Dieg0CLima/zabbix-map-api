@@ -1,5 +1,6 @@
 class Api::V1::Users::RegistrationsController < Devise::RegistrationsController
   include RackSessionsFix
+  include OrganizationSerializable
   respond_to :json
 
   def create
@@ -29,18 +30,8 @@ class Api::V1::Users::RegistrationsController < Devise::RegistrationsController
     {
       id: result.user.id,
       email: result.user.email,
-      organization: organization_payload(result.organization, result.membership)
+      organization: serialize_organization(result.organization, result.membership&.role)
     }
   end
 
-  def organization_payload(organization, membership)
-    return nil if organization.blank?
-
-    {
-      id: organization.id,
-      name: organization.name,
-      slug: organization.slug,
-      role: membership&.role
-    }
-  end
 end
