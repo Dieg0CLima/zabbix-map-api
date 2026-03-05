@@ -1,4 +1,6 @@
 class Api::V1::MapNodesController < ApplicationController
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_network_map
@@ -47,13 +49,7 @@ class Api::V1::MapNodesController < ApplicationController
   private
 
   def set_network_map
-    maps_scope = if admin_without_organization_context?
-      NetworkMap
-    else
-      current_organization.network_maps
-    end
-
-    @network_map = maps_scope.find(params[:network_map_id])
+    @network_map = scoped_network_maps.find(params[:network_map_id])
   end
 
   def set_map_node

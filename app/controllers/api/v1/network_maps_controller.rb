@@ -1,11 +1,13 @@
 class Api::V1::NetworkMapsController < ApplicationController
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_network_map, only: %i[show update destroy]
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    maps = network_maps_scope.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points)
+    maps = scoped_network_maps.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points)
 
     render json: { data: maps.map { |map| network_map_payload(map) } }, status: :ok
   end
@@ -47,11 +49,7 @@ class Api::V1::NetworkMapsController < ApplicationController
   private
 
   def set_network_map
-    @network_map = network_maps_scope.find(params[:id])
-  end
-
-  def network_maps_scope
-    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
+    @network_map = scoped_network_maps.find(params[:id])
   end
 
   def permitted_network_map_payload

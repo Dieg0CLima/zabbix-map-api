@@ -1,4 +1,6 @@
 class Api::V1::MapPopsController < ApplicationController
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_network_map
@@ -47,11 +49,7 @@ class Api::V1::MapPopsController < ApplicationController
   private
 
   def set_network_map
-    @network_map = network_maps_scope.find(params[:network_map_id])
-  end
-
-  def network_maps_scope
-    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
+    @network_map = scoped_network_maps.find(params[:network_map_id])
   end
 
   def set_map_pop
