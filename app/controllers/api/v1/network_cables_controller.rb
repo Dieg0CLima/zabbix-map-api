@@ -1,4 +1,7 @@
 class Api::V1::NetworkCablesController < ApplicationController
+  include DomainErrorHandler
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_network_map
@@ -6,7 +9,11 @@ class Api::V1::NetworkCablesController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    cables = apply_filters(@network_map.network_cables.includes(:network_cable_points)).order(:id)
+    cables = NetworkCables::FilterQuery.new(
+      scope: @network_map.network_cables.includes(:network_cable_points),
+      params: filter_params,
+      network_map: @network_map
+    ).call.order(:id)
 
     render json: { data: cables.map { |cable| cable_payload(cable) } }, status: :ok
   end
@@ -53,25 +60,8 @@ class Api::V1::NetworkCablesController < ApplicationController
 
   private
 
-
-  def render_domain_error(error)
-    render json: {
-      error: {
-        code: error.code,
-        message: error.message,
-        details: error.details
-      }
-    }, status: :unprocessable_entity
-  end
-
   def set_network_map
-    maps_scope = if admin_without_organization_context?
-      NetworkMap
-    else
-      current_organization.network_maps
-    end
-
-    @network_map = maps_scope.find(params[:network_map_id])
+    @network_map = scoped_network_maps.find(params[:network_map_id])
   end
 
   def set_network_cable
@@ -98,40 +88,11 @@ class Api::V1::NetworkCablesController < ApplicationController
     )
   end
 
+  def filter_params
+    params.permit(:status, :cable_type, :network_role, :source_pop_id, :target_pop_id, :q, :fiber_count_min, :fiber_count_max)
+  end
+
   def cable_payload(cable)
     NetworkCables::PayloadBuilder.new(cable:).call
-  end
-
-  def apply_filters(scope)
-    scope = scope.where(status: params[:status]) if params[:status].present?
-    scope = scope.where(cable_type: params[:cable_type]) if params[:cable_type].present?
-
-    if params[:network_role].present?
-      scope = scope.where("metadata ->> 'network_role' = ?", params[:network_role])
-    end
-
-    scope = scope.where(source_pop_id: resolve_pop_filter(params[:source_pop_id])) if params[:source_pop_id].present?
-    scope = scope.where(target_pop_id: resolve_pop_filter(params[:target_pop_id])) if params[:target_pop_id].present?
-
-    if params[:q].present?
-      query = "%#{params[:q]}%"
-      scope = scope.where("label ILIKE ? OR metadata ->> 'code' ILIKE ?", query, query)
-    end
-
-    if params[:fiber_count_min].present?
-      scope = scope.where("(metadata ->> 'fiber_count')::int >= ?", params[:fiber_count_min].to_i)
-    end
-
-    if params[:fiber_count_max].present?
-      scope = scope.where("(metadata ->> 'fiber_count')::int <= ?", params[:fiber_count_max].to_i)
-    end
-
-    scope
-  end
-
-  def resolve_pop_filter(value)
-    return value if value.to_s.match?(/\A\d+\z/)
-
-    @network_map.map_pops.find_by(external_id: value)&.id
   end
 end
