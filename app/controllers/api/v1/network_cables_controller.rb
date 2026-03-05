@@ -83,6 +83,7 @@ class Api::V1::NetworkCablesController < ApplicationController
       :pattern,
       :bandwidth_mbps,
       :length_meters,
+      :network_link_id,
       metadata: {},
       points: [:position, :x, :y, :lat, :lng]
     )

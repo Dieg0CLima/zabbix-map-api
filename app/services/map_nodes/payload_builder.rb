@@ -8,6 +8,8 @@ class MapNodes::PayloadBuilder
       id: @map_node.external_id || @map_node.id,
       network_map_id: @map_node.network_map_id,
       pop_id: @map_node.map_pop&.external_id || @map_node.map_pop_id,
+      device_id: @map_node.device&.external_id || @map_node.device_id,
+      device: device_payload,
       label: @map_node.label,
       external_id: @map_node.external_id,
       node_kind: @map_node.node_kind,
@@ -18,10 +20,22 @@ class MapNodes::PayloadBuilder
       icon: @map_node.icon,
       color: @map_node.color,
       size: @map_node.size,
-      zabbix_ref: @map_node.zabbix_ref,
+      zabbix_ref: @map_node.device&.zabbix_ref.presence || @map_node.zabbix_ref,
       metadata: @map_node.metadata,
       created_at: @map_node.created_at,
       updated_at: @map_node.updated_at
+    }
+  end
+
+  private
+
+  def device_payload
+    return if @map_node.device.blank?
+
+    {
+      external_id: @map_node.device.external_id,
+      name: @map_node.device.name,
+      zabbix_ref: @map_node.device.zabbix_ref
     }
   end
 end

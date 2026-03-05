@@ -10,11 +10,13 @@ class NetworkCable < ApplicationRecord
 
   belongs_to :source_node, class_name: "MapNode", inverse_of: :outgoing_cables, optional: true
   belongs_to :target_node, class_name: "MapNode", inverse_of: :incoming_cables, optional: true
+  belongs_to :network_link, optional: true
 
   has_many :network_cable_points, dependent: :destroy
   has_many :network_cable_events, dependent: :destroy
 
   before_validation :resolve_pop_external_ids
+  before_validation :resolve_network_link_external_id
   before_validation :apply_default_visuals
   before_validation :derive_pops_from_nodes
 
@@ -66,6 +68,18 @@ class NetworkCable < ApplicationRecord
     super(value)
   end
 
+
+  def network_link_id=(value)
+    @network_link_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @network_link_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
+
   private
 
   def apply_default_visuals
@@ -87,6 +101,16 @@ class NetworkCable < ApplicationRecord
     if @target_pop_external_id.present?
       self.target_pop = network_map.map_pops.find_by(external_id: @target_pop_external_id)
     end
+  end
+
+
+  def resolve_network_link_external_id
+    return if @network_link_external_id.blank? || network_map.blank?
+
+    self.network_link = network_map.organization.network_links.find_by(external_id: @network_link_external_id)
+    return if network_link.present?
+
+    errors.add(:network_link_id, "must reference an existing network_link external_id")
   end
 
   def derive_pops_from_nodes

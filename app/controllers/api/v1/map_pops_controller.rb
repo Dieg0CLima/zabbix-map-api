@@ -61,7 +61,7 @@ class Api::V1::MapPopsController < ApplicationController
   end
 
   def permitted_map_pop_payload
-    params.require(:map_pop).permit(:name, :external_id, :lat, :lng, :color, metadata: {})
+    params.require(:map_pop).permit(:name, :external_id, :lat, :lng, :color, :site_id, metadata: {})
   end
 
   def map_pop_payload(pop)
