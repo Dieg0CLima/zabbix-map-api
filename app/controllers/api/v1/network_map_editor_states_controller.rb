@@ -1,5 +1,6 @@
 class Api::V1::NetworkMapEditorStatesController < ApplicationController
   include EditorStateParams
+  include OrganizationScoped
 
   before_action :authenticate_user!
   before_action :ensure_organization_access!
@@ -21,11 +22,7 @@ class Api::V1::NetworkMapEditorStatesController < ApplicationController
   private
 
   def set_network_map
-    @network_map = network_maps_scope.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points).find(params[:network_map_id])
-  end
-
-  def network_maps_scope
-    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
+    @network_map = scoped_network_maps.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points).find(params[:network_map_id])
   end
 
   def editor_payload(network_map)

@@ -1,12 +1,13 @@
-# app/controllers/api/v1/zabbix_connections_controller.rb
 class Api::V1::ZabbixConnectionsController < ApplicationController
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_zabbix_connection, only: %i[show update destroy]
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    connections = zabbix_connections_scope.order(:id)
+    connections = scoped_zabbix_connections.order(:id)
 
     render json: { data: connections.map { |connection| connection_payload(connection) } }, status: :ok
   end
@@ -47,11 +48,7 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   private
 
   def set_zabbix_connection
-    @zabbix_connection = zabbix_connections_scope.find(params[:id])
-  end
-
-  def zabbix_connections_scope
-    admin_without_organization_context? ? ZabbixConnection : current_organization.zabbix_connections
+    @zabbix_connection = scoped_zabbix_connections.find(params[:id])
   end
 
   def zabbix_connection_params

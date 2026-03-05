@@ -1,12 +1,13 @@
 class Api::V1::NetworkProjectsController < ApplicationController
   include EditorStateParams
+  include OrganizationScoped
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_project, only: %i[show update destroy save]
   before_action :require_editor_or_admin!, only: %i[create update destroy save]
 
   def index
-    projects = network_projects_scope.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
+    projects = scoped_network_maps.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
 
     render json: { data: projects.map { |project| project_payload(project) } }, status: :ok
   end
@@ -54,11 +55,7 @@ class Api::V1::NetworkProjectsController < ApplicationController
   private
 
   def set_project
-    @project = network_projects_scope.find(params[:id])
-  end
-
-  def network_projects_scope
-    admin_without_organization_context? ? NetworkMap : current_organization.network_maps
+    @project = scoped_network_maps.find(params[:id])
   end
 
   def permitted_project_payload
