@@ -74,6 +74,7 @@ class Api::V1::MapNodesController < ApplicationController
       :color,
       :size,
       :zabbix_ref,
+      :device_id,
       metadata: {}
     )
   end

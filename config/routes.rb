@@ -14,6 +14,10 @@ Rails.application.routes.draw do
         end
       end
 
+      resources :sites
+      resources :devices
+      resources :network_links
+
       resources :network_maps do
         resources :map_pops
         resources :map_nodes
@@ -21,6 +25,7 @@ Rails.application.routes.draw do
           resources :events, controller: "network_cable_events", only: :index
         end
         resource :editor_state, controller: "network_map_editor_states", only: %i[show update]
+        resource :monitoring, controller: "network_map_monitoring", only: :show
       end
 
       resources :zabbix_connections do

@@ -3,8 +3,10 @@ class MapNode < ApplicationRecord
 
   belongs_to :network_map
   belongs_to :map_pop, optional: true
+  belongs_to :device, optional: true
 
   before_validation :resolve_map_pop_external_id
+  before_validation :resolve_device_external_id
   before_validation :apply_default_visuals
 
   has_many :outgoing_cables,
@@ -39,6 +41,18 @@ class MapNode < ApplicationRecord
     super(value)
   end
 
+
+  def device_id=(value)
+    @device_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @device_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
+
   private
 
   def apply_default_visuals
@@ -56,6 +70,16 @@ class MapNode < ApplicationRecord
     return if @map_pop_external_id.blank? || network_map.blank?
 
     self.map_pop = network_map.map_pops.find_by(external_id: @map_pop_external_id)
+  end
+
+
+  def resolve_device_external_id
+    return if @device_external_id.blank? || network_map.blank?
+
+    self.device = network_map.organization.devices.find_by(external_id: @device_external_id)
+    return if device.present?
+
+    errors.add(:device_id, "must reference an existing device external_id")
   end
 
   def map_pop_external_id_must_exist

@@ -40,4 +40,41 @@ class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
     created_node = network_map.map_nodes.order(:id).last
     assert_equal pop.id, created_node.map_pop_id
   end
+
+  test "create accepts device_id as device external_id" do
+    organization = Organization.create!(name: "Org Node Device")
+    user = User.create!(email: "node.device@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user:, organization:, role: "editor")
+
+    network_map = organization.network_maps.create!(name: "Mapa Node Device", source_type: "manual")
+    pop = network_map.map_pops.create!(name: "POP API", external_id: "pop-api2", lat: -23.0, lng: -46.0, color: "#7c3aed")
+    device = organization.devices.create!(name: "Device X", external_id: "device-x", device_type: "switch", status: "active")
+
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: user.email,
+        password: "Password!123",
+        organization_id: organization.id
+      }
+    }, as: :json
+
+    auth_header = response.headers["Authorization"]
+
+    post "/api/v1/network_maps/#{network_map.id}/map_nodes", params: {
+      map_node: {
+        label: "Router API",
+        node_kind: "router",
+        x: 100,
+        y: 120,
+        map_pop_id: pop.external_id,
+        device_id: device.external_id
+      },
+      organization_id: organization.id
+    }, headers: {
+      "Authorization" => auth_header
+    }, as: :json
+
+    assert_response :created
+    assert_equal device.external_id, response.parsed_body.dig("data", "device_id")
+  end
 end

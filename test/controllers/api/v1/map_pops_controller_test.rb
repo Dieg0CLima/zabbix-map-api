@@ -1,15 +1,10 @@
 require "test_helper"
 
 class Api::V1::MapPopsControllerTest < ActionDispatch::IntegrationTest
-  test "create returns external id as id and persists the same external_id" do
-    organization = Organization.create!(name: "Org POP Test")
-    user = User.create!(
-      email: "pop.editor@example.com",
-      password: "Password!123",
-      password_confirmation: "Password!123"
-    )
+  test "create auto-generates external_id and mirrors id in payload" do
+    organization = Organization.create!(name: "Org POP")
+    user = User.create!(email: "pop.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
     Membership.create!(user:, organization:, role: "editor")
-
     network_map = organization.network_maps.create!(name: "Mapa POP", source_type: "manual")
 
     post "/api/v1/users/sign_in", params: {
@@ -69,5 +64,24 @@ class Api::V1::MapPopsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_equal "VALIDATION_ERROR", response.parsed_body["code"]
+  end
+
+  test "create accepts site_id as external_id" do
+    organization = Organization.create!(name: "Org Pop Site")
+    site = organization.sites.create!(name: "Site Ref", external_id: "site-ref", status: "active")
+    user = User.create!(email: "pop.site@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user:, organization:, role: "editor")
+    network_map = organization.network_maps.create!(name: "Map Pop Site", source_type: "manual")
+
+    post "/api/v1/users/sign_in", params: { user: { email: user.email, password: "Password!123", organization_id: organization.id } }, as: :json
+    auth_header = response.headers["Authorization"]
+
+    post "/api/v1/network_maps/#{network_map.id}/map_pops", params: {
+      map_pop: { name: "POP Site", lat: -23, lng: -46, color: "#7c3aed", site_id: site.external_id },
+      organization_id: organization.id
+    }, headers: { "Authorization" => auth_header }, as: :json
+
+    assert_response :created
+    assert_equal site.external_id, response.parsed_body.dig("data", "site_id")
   end
 end
