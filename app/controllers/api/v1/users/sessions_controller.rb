@@ -1,5 +1,6 @@
 class Api::V1::Users::SessionsController < Devise::SessionsController
   include RackSessionsFix
+  include OrganizationSerializable
   respond_to :json
 
   private
@@ -16,7 +17,7 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
         id: resource.id,
         email: resource.email,
         org_id: organization&.id,
-        organization: serialized_organization(resource, organization),
+        organization: serialize_organization(organization, resource.membership_for(organization&.id)&.role),
         admin: resource.admin?
       }
     }, status: :ok
@@ -39,14 +40,4 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
     user.organizations.find_by(id: requested_org_id)
   end
 
-  def serialized_organization(user, organization)
-    return nil if organization.blank?
-
-    {
-      id: organization.id,
-      name: organization.name,
-      slug: organization.slug,
-      role: user.membership_for(organization.id)&.role
-    }
-  end
 end
