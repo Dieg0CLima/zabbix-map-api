@@ -1,4 +1,7 @@
 class Api::V1::ZabbixHostsController < ApplicationController
+  include DomainErrorHandler
+  include OrganizationScoped
+
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_zabbix_connection
@@ -8,19 +11,14 @@ class Api::V1::ZabbixHostsController < ApplicationController
 
     render json: { data: hosts }, status: :ok
   rescue Zabbix::DatabaseHostsFetcher::UnsupportedAdapterError => e
-    render json: { error: e.message }, status: :unprocessable_entity
+    render_validation_error({ adapter: e.message }, message: "Unsupported adapter")
   rescue Zabbix::DatabaseHostsFetcher::Error => e
-    render json: { error: "Unable to fetch hosts from Zabbix database", details: e.message }, status: :service_unavailable
+    render_service_unavailable(message: "Unable to fetch hosts from Zabbix database", details: e.message)
   end
 
   private
 
   def set_zabbix_connection
-    @zabbix_connection = zabbix_connections_scope.find(params[:zabbix_connection_id])
+    @zabbix_connection = scoped_zabbix_connections.find(params[:zabbix_connection_id])
   end
-
-  def zabbix_connections_scope
-    admin_without_organization_context? ? ZabbixConnection : current_organization.zabbix_connections
-  end
-
 end
