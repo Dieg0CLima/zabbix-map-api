@@ -9,6 +9,8 @@ module Zabbix
                inverse_of: :items,
                optional: true
 
+    has_many :map_node_items, dependent: :destroy
+
     validates :itemid, presence: true, uniqueness: { scope: :zabbix_connection_id }
     validates :key_, presence: true
     validates :name, presence: true

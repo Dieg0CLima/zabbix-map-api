@@ -19,6 +19,7 @@ class MapNodes::PayloadBuilder
       color: @map_node.color,
       size: @map_node.size,
       zabbix_ref: @map_node.zabbix_ref,
+      zabbix_host_id: @map_node.zabbix_host_id,
       metadata: @map_node.metadata,
       created_at: @map_node.created_at,
       updated_at: @map_node.updated_at
