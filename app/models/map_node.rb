@@ -3,6 +3,9 @@ class MapNode < ApplicationRecord
 
   belongs_to :network_map
   belongs_to :map_pop, optional: true
+  belongs_to :zabbix_host, class_name: "Zabbix::Host", optional: true
+
+  has_many :map_node_items, dependent: :destroy
 
   before_validation :resolve_map_pop_external_id
   before_validation :apply_default_visuals

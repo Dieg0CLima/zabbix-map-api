@@ -21,6 +21,21 @@ class Api::V1::ZabbixItemsController < ApplicationController
     render_service_unavailable(message: "Unable to fetch items from Zabbix database", details: e.message)
   end
 
+  def dropdown
+    items = @zabbix_connection.zabbix_items.order(:name)
+    items = items.where(zabbix_host_id: params[:zabbix_host_id]) if params[:zabbix_host_id].present?
+    data = items.map do |i|
+      {
+        value: i.id,
+        label: "#{i.name} (#{i.key_})",
+        itemid: i.itemid,
+        units: i.units,
+        value_type: i.value_type
+      }
+    end
+    render json: { data: data }, status: :ok
+  end
+
   private
 
   def set_zabbix_connection
