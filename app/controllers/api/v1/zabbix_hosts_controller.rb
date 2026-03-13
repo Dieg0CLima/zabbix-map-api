@@ -17,9 +17,23 @@ class Api::V1::ZabbixHostsController < ApplicationController
   end
 
   def dropdown
-    hosts = @zabbix_connection.zabbix_hosts.order(:name)
-    data = hosts.map { |h| { value: h.id, label: h.name, hostid: h.hostid, available: h.available } }
-    render json: { data: data }, status: :ok
+    result = ZabbixConnections::HostDropdownFetcher.new(
+      connection: @zabbix_connection,
+      limit: params[:limit],
+      query: params[:q]
+    ).call
+
+    render json: {
+      data: result,
+      meta: {
+        connection_id: @zabbix_connection.id,
+        total: result.size
+      }
+    }, status: :ok
+  rescue ZabbixConnections::HostDropdownFetcher::UnsupportedAdapterError => e
+    render_validation_error({ adapter: e.message }, message: "Unsupported adapter")
+  rescue ZabbixConnections::HostDropdownFetcher::Error => e
+    render_service_unavailable(message: "Unable to fetch hosts from Zabbix", details: e.message)
   end
 
   private
