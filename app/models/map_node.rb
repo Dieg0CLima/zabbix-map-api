@@ -31,6 +31,7 @@ class MapNode < ApplicationRecord
   validate :pop_must_belong_to_same_map
   validate :map_pop_external_id_must_exist
   validate :zabbix_host_id_format
+  validate :zabbix_host_requires_connection
   validate :zabbix_host_must_belong_to_network_map_connection
 
   def map_pop_id=(value)
@@ -81,6 +82,14 @@ class MapNode < ApplicationRecord
     return if zabbix_host_id_before_type_cast.to_s.match?(/\A\d+\z/)
 
     errors.add(:zabbix_host_id, "must be numeric")
+  end
+
+  def zabbix_host_requires_connection
+    return if zabbix_host.blank? || network_map.blank?
+
+    if network_map.zabbix_connection_id.blank?
+      errors.add(:zabbix_host_id, "requires the map to have a Zabbix connection configured")
+    end
   end
 
   def zabbix_host_must_belong_to_network_map_connection
