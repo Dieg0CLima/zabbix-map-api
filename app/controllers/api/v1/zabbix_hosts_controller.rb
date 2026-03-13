@@ -17,7 +17,11 @@ class Api::V1::ZabbixHostsController < ApplicationController
   end
 
   def dropdown
-    result = ZabbixConnections::HostDropdownFetcher.new(connection: @zabbix_connection, limit: params[:limit]).call
+    result = ZabbixConnections::HostDropdownFetcher.new(
+      connection: @zabbix_connection,
+      limit: params[:limit],
+      query: params[:q]
+    ).call
 
     render json: {
       data: result,

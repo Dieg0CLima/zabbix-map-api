@@ -1,14 +1,15 @@
 module Zabbix
   class DatabaseHostsFetcher
-    DEFAULT_LIMIT = 200
-    MAX_LIMIT = 1_000
+    DEFAULT_LIMIT = 500
+    MAX_LIMIT = 10_000
 
     class Error < StandardError; end
     class UnsupportedAdapterError < Error; end
 
-    def initialize(connection:, limit: nil)
+    def initialize(connection:, limit: nil, search: nil)
       @connection = connection
       @limit = normalize_limit(limit)
+      @search = search.to_s.strip
     end
 
     def call
@@ -16,11 +17,11 @@ module Zabbix
 
       database_connection.with_client do |client, adapter|
         rows = if adapter == :postgresql
-          client.exec_params(postgresql_sql, [@limit]).to_a
+          client.exec_params(postgresql_sql, [search_term, @limit]).to_a
         else
           statement = client.prepare(mysql_sql)
           begin
-            statement.execute(@limit).to_a
+            statement.execute(search_term, search_term, search_term, @limit).to_a
           ensure
             statement&.close
           end
@@ -48,8 +49,9 @@ module Zabbix
           h.name,
           h.status::text AS status
         FROM hosts h
-        ORDER BY h.hostid
-        LIMIT $1
+        WHERE (h.name ILIKE $1 OR h.host ILIKE $1 OR h.hostid::text ILIKE $1)
+        ORDER BY h.name_upper NULLS LAST, h.name, h.hostid
+        LIMIT $2
       SQL
     end
 
@@ -61,7 +63,8 @@ module Zabbix
           h.name,
           CAST(h.status AS CHAR) AS status
         FROM hosts h
-        ORDER BY h.hostid
+        WHERE (h.name LIKE ? OR h.host LIKE ? OR CAST(h.hostid AS CHAR) LIKE ?)
+        ORDER BY h.name_upper, h.name, h.hostid
         LIMIT ?
       SQL
     end
@@ -73,6 +76,12 @@ module Zabbix
         name: row["name"],
         status: row["status"]
       }
+    end
+
+    def search_term
+      return "%" if @search.blank?
+
+      "%#{@search}%"
     end
 
     def normalize_limit(limit)

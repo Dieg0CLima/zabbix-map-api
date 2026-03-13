@@ -1,10 +1,14 @@
 class ZabbixConnections::HostDropdownFetcher
+  DEFAULT_LIMIT = 5_000
+  MAX_LIMIT = 10_000
+
   class Error < StandardError; end
   class UnsupportedAdapterError < Error; end
 
-  def initialize(connection:, limit: nil)
+  def initialize(connection:, limit: nil, query: nil)
     @connection = connection
-    @limit = limit
+    @limit = normalize_limit(limit)
+    @query = query.to_s.strip
   end
 
   def call
@@ -21,37 +25,47 @@ class ZabbixConnections::HostDropdownFetcher
         value: host[:hostid].to_s,
         label: host[:name].presence || host[:host].to_s,
         hostid: host[:hostid].to_s,
-        available: host_available?(host[:status])
+        available: db_status_available?(host[:status])
       }
     end
   end
 
   def persisted_dropdown_hosts
-    @connection.zabbix_hosts.order(:name, :hostid).map do |host|
+    scope = @connection.zabbix_hosts
+    scope = scope.where("name ILIKE :q OR hostid ILIKE :q", q: "%#{@query}%") if @query.present?
+
+    scope.order(:name, :hostid).limit(@limit).map do |host|
       {
         value: host.hostid.to_s,
         label: host.name,
         hostid: host.hostid.to_s,
-        available: host_available?(host.available)
+        available: persisted_available?(host.available)
       }
     end
   end
 
   def fetched_hosts
-    Zabbix::DatabaseHostsFetcher.new(connection: @connection, limit: @limit).call
+    Zabbix::DatabaseHostsFetcher.new(connection: @connection, limit: @limit, search: @query).call
   rescue Zabbix::DatabaseHostsFetcher::UnsupportedAdapterError => e
     raise UnsupportedAdapterError, e.message
   rescue Zabbix::DatabaseHostsFetcher::Error => e
     raise Error, e.message
   end
 
-  def host_available?(value)
+  def db_status_available?(status)
+    status.to_s == "0"
+  end
+
+  def persisted_available?(value)
     return value if value == true || value == false
 
     normalized = value.to_s.strip.downcase
-    return true if normalized.in?(["1", "true", "up", "available", "enabled", "0"])
-    return false if normalized.in?(["2", "false", "down", "unavailable", "disabled"])
+    normalized.in?(["1", "true", "up", "available", "enabled"])
+  end
 
-    false
+  def normalize_limit(limit)
+    value = limit.to_i
+    value = DEFAULT_LIMIT if value <= 0
+    [value, MAX_LIMIT].min
   end
 end

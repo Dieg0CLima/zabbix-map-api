@@ -19,6 +19,25 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
     assert_equal "OLT-POP-CENTRO", result.first[:label]
     assert_equal "10105", result.first[:value]
     assert_equal true, result.first[:available]
+    assert_equal false, result.last[:available]
+  end
+
+  test "filters persisted hosts by query" do
+    organization = Organization.create!(name: "Org Dropdown API Search")
+    connection = organization.zabbix_connections.create!(
+      name: "Conn API Search",
+      status: "active",
+      connection_mode: "api",
+      base_url: "https://zabbix.local"
+    )
+
+    connection.zabbix_hosts.create!(hostid: "10634", name: "SWCX-001-001-005-CENTRAL", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10106", name: "MikroTik RB260GS by SNMP", available: "1")
+
+    result = ZabbixConnections::HostDropdownFetcher.new(connection: connection, query: "SWCX").call
+
+    assert_equal 1, result.size
+    assert_equal "SWCX-001-001-005-CENTRAL", result.first[:label]
   end
 
   test "returns hosts from database fetcher in database mode" do
@@ -36,16 +55,16 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
 
     mock_fetcher = Minitest::Mock.new
     mock_fetcher.expect(:call, [
-      { hostid: "20", name: "Switch-1", host: "switch-1", status: "0" },
-      { hostid: "10", name: "Router-1", host: "router-1", status: "1" }
+      { hostid: "20", name: "Switch-1", host: "switch-1", status: "1" },
+      { hostid: "10", name: "Router-1", host: "router-1", status: "0" }
     ])
 
     Zabbix::DatabaseHostsFetcher.stub(:new, mock_fetcher) do
-      result = ZabbixConnections::HostDropdownFetcher.new(connection: connection, limit: 50).call
+      result = ZabbixConnections::HostDropdownFetcher.new(connection: connection, limit: 50, query: "Router").call
 
       assert_equal ["Router-1", "Switch-1"], result.map { |row| row[:label] }
-      assert_equal false, result.first[:available]
-      assert_equal true, result.last[:available]
+      assert_equal true, result.first[:available]
+      assert_equal false, result.last[:available]
     end
 
     mock_fetcher.verify

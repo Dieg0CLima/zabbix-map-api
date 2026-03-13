@@ -39,4 +39,44 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "OLT-POP-CENTRO", body.dig("data", 0, "label")
     assert_equal true, body.dig("data", 0, "available")
   end
+
+
+  test "dropdown filters hosts by query" do
+    organization = Organization.create!(name: "Org Hosts API Query")
+    user = User.create!(email: "hosts.query.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user: user, organization: organization, role: "editor")
+
+    connection = organization.zabbix_connections.create!(
+      name: "Conn Query",
+      status: "active",
+      connection_mode: "api",
+      base_url: "https://zabbix.local"
+    )
+    connection.zabbix_hosts.create!(hostid: "10634", name: "SWCX-001-001-005-CENTRAL", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10106", name: "MikroTik RB260GS by SNMP", available: "1")
+
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: user.email,
+        password: "Password!123",
+        organization_id: organization.id
+      }
+    }, as: :json
+
+    auth_header = response.headers["Authorization"]
+
+    get "/api/v1/zabbix_connections/#{connection.id}/zabbix_hosts/dropdown", params: {
+      organization_id: organization.id,
+      q: "SWCX"
+    }, headers: {
+      "Authorization" => auth_header
+    }, as: :json
+
+    assert_response :ok
+
+    body = JSON.parse(response.body)
+    assert_equal 1, body.dig("meta", "total")
+    assert_equal "SWCX-001-001-005-CENTRAL", body.dig("data", 0, "label")
+  end
+
 end
