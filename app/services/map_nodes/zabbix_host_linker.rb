@@ -9,10 +9,20 @@ class MapNodes::ZabbixHostLinker
     return @payload if @payload[:zabbix_host_id].blank?
 
     host = resolve_host
-    return @payload unless host
 
-    @payload[:zabbix_host_id] = host.id
-    @payload[:zabbix_ref] ||= host.hostid
+    if host
+      # Host found locally — set the real FK and soft reference.
+      @payload[:zabbix_host_id] = host.id
+      @payload[:zabbix_ref] ||= host.hostid
+    else
+      # Host not found in local zabbix_hosts (common in db mode where hosts are
+      # fetched live from Zabbix without being synced to the local table).
+      # Preserve zabbix_ref for display/reference but nil out zabbix_host_id to
+      # avoid a FK violation. The binding can be set later via the panel once synced.
+      @payload[:zabbix_ref] ||= @payload[:zabbix_host_id].to_s
+      @payload[:zabbix_host_id] = nil
+    end
+
     @payload
   end
 
