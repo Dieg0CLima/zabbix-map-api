@@ -5,8 +5,14 @@ class MapNodes::Create
   end
 
   def call
-    map_node = @network_map.map_nodes.new(@payload)
+    map_node = @network_map.map_nodes.new(linked_payload)
     map_node.save!
     map_node
+  end
+
+  private
+
+  def linked_payload
+    @linked_payload ||= MapNodes::ZabbixHostLinker.new(network_map: @network_map, payload: @payload).call
   end
 end
