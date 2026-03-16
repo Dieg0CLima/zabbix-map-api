@@ -20,6 +20,9 @@ class MapNodes::PayloadBuilder
       size: @map_node.size,
       zabbix_ref: @map_node.zabbix_ref,
       zabbix_host_id: @map_node.zabbix_host_id,
+      hostname: @map_node.hostname,
+      ip_address: @map_node.ip_address,
+      description: @map_node.description,
       metadata: @map_node.metadata,
       created_at: @map_node.created_at,
       updated_at: @map_node.updated_at

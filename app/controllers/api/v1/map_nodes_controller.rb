@@ -75,6 +75,9 @@ class Api::V1::MapNodesController < ApplicationController
       :size,
       :zabbix_ref,
       :zabbix_host_id,
+      :hostname,
+      :ip_address,
+      :description,
       metadata: {}
     )
   end

@@ -1,6 +1,20 @@
 require "test_helper"
 
 class ZabbixItems::FetchTest < ActiveSupport::TestCase
+  test "filters persisted items by hostid string (Zabbix hostid) when db mode disabled" do
+    organization = Organization.create!(name: "Org ZI Fetch Hostid")
+    connection = organization.zabbix_connections.create!(name: "Conn Hostid", status: "active", connection_mode: "api", base_url: "https://zabbix.local")
+    host_a = connection.zabbix_hosts.create!(hostid: "201", name: "Core-1")
+    host_b = connection.zabbix_hosts.create!(hostid: "202", name: "Core-2")
+    connection.zabbix_items.create!(itemid: "11", name: "CPU", key_: "system.cpu", value_type: 3, zabbix_host: host_a)
+    connection.zabbix_items.create!(itemid: "12", name: "RAM", key_: "vm.memory", value_type: 3, zabbix_host: host_b)
+
+    items = ZabbixItems::Fetch.new(connection:, hostid: "201", zabbix_host_id: nil, limit: nil).call
+
+    assert_equal 1, items.count
+    assert_equal "CPU", items.first.name
+  end
+
   test "filters persisted items by zabbix_host_id when db mode disabled" do
     organization = Organization.create!(name: "Org ZI Fetch")
     connection = organization.zabbix_connections.create!(name: "Conn", status: "active", connection_mode: "api", base_url: "https://zabbix.local")
