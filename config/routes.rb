@@ -17,7 +17,7 @@ Rails.application.routes.draw do
       end
 
       resources :network_maps do
-        resources :map_pops
+        resources :sites
         resources :map_nodes do
           resources :map_node_items, only: %i[index create destroy]
         end
@@ -29,7 +29,6 @@ Rails.application.routes.draw do
         get "metrics/events", to: "network_map_metrics#events"
       end
 
-      resources :sites
       resources :devices
 
       resources :zabbix_connections do

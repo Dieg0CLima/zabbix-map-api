@@ -2,13 +2,13 @@ class MapNode < ApplicationRecord
   NODE_KINDS = %w[switch router server firewall gateway endpoint text zabbix_host olt cto splitter].freeze
 
   belongs_to :network_map
-  belongs_to :map_pop, optional: true
+  belongs_to :site, optional: true
   belongs_to :zabbix_host, class_name: "Zabbix::Host", optional: true
   belongs_to :device, optional: true
 
   has_many :map_node_items, dependent: :destroy
 
-  before_validation :resolve_map_pop_external_id
+  before_validation :resolve_site_external_id
   before_validation :apply_default_visuals
 
   has_many :outgoing_cables,
@@ -29,17 +29,17 @@ class MapNode < ApplicationRecord
   validates :size, numericality: { only_integer: true, greater_than_or_equal_to: 18, less_than_or_equal_to: 56 }
   validates :icon, :color, presence: true
 
-  validate :pop_must_belong_to_same_map
-  validate :map_pop_external_id_must_exist
+  validate :site_must_belong_to_same_map
+  validate :site_external_id_must_exist
   validate :zabbix_host_id_format
   validate :zabbix_host_requires_connection
   validate :zabbix_host_must_belong_to_network_map_connection
 
-  def map_pop_id=(value)
-    @map_pop_external_id = nil
+  def site_id=(value)
+    @site_external_id = nil
 
     if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
-      @map_pop_external_id = value
+      @site_external_id = value
       return super(nil)
     end
 
@@ -59,23 +59,23 @@ class MapNode < ApplicationRecord
     self.y ||= lng
   end
 
-  def resolve_map_pop_external_id
-    return if @map_pop_external_id.blank? || network_map.blank?
+  def resolve_site_external_id
+    return if @site_external_id.blank? || network_map.blank?
 
-    self.map_pop = network_map.map_pops.find_by(external_id: @map_pop_external_id)
+    self.site = network_map.sites.find_by(external_id: @site_external_id)
   end
 
-  def map_pop_external_id_must_exist
-    return if @map_pop_external_id.blank? || map_pop.present?
+  def site_external_id_must_exist
+    return if @site_external_id.blank? || site.present?
 
-    errors.add(:map_pop_id, "must reference an existing pop external_id")
+    errors.add(:site_id, "must reference an existing site external_id")
   end
 
-  def pop_must_belong_to_same_map
-    return if map_pop.blank? || network_map.blank?
-    return if map_pop.network_map_id == network_map_id
+  def site_must_belong_to_same_map
+    return if site.blank? || network_map.blank?
+    return if site.network_map_id == network_map_id
 
-    errors.add(:map_pop, "must belong to the same network map")
+    errors.add(:site, "must belong to the same network map")
   end
 
   def zabbix_host_id_format

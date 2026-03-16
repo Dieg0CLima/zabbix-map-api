@@ -21,13 +21,11 @@ class MapNodes::Create
     Device::EQUIPMENT_KINDS.include?(node.node_kind) && node.device_id.blank?
   end
 
-  # Auto-creates a Device inventory record linked to this map node.
-  # Inherits site from the POP (if the node belongs to a POP with a Site).
   def auto_create_device!(node)
     device = @network_map.organization.devices.create!(
       name: node.label,
       device_type: node.node_kind,
-      site_id: node.map_pop&.site_id,
+      site_id: node.site_id,
       zabbix_ref: node.zabbix_ref
     )
     node.update_column(:device_id, device.id)

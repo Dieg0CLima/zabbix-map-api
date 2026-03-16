@@ -7,7 +7,7 @@ class MapNodes::PayloadBuilder
     {
       id: @map_node.external_id || @map_node.id,
       network_map_id: @map_node.network_map_id,
-      pop_id: @map_node.map_pop&.external_id || @map_node.map_pop_id,
+      site_id: @map_node.site&.external_id || @map_node.site_id,
       label: @map_node.label,
       external_id: @map_node.external_id,
       node_kind: @map_node.node_kind,

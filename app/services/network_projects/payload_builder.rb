@@ -11,7 +11,7 @@ module NetworkProjects
         name: @project.name,
         description: @project.description,
         active_base_layer: @project.active_base_layer,
-        pops: pops_payload,
+        sites: sites_payload,
         nodes: nodes_payload,
         cables: cables_payload
       }
@@ -19,15 +19,15 @@ module NetworkProjects
 
     private
 
-    def pops_payload
-      @project.map_pops.order(:id).map do |pop|
+    def sites_payload
+      @project.sites.order(:id).map do |site|
         {
-          id: pop.external_id,
-          name: pop.name,
-          lat: pop.lat,
-          lng: pop.lng,
-          color: pop.color,
-          metadata: pop.metadata
+          id: site.external_id,
+          name: site.name,
+          lat: site.lat,
+          lng: site.lng,
+          color: site.color,
+          metadata: site.metadata
         }
       end
     end
@@ -36,7 +36,7 @@ module NetworkProjects
       @project.map_nodes.order(:id).map do |node|
         {
           id: node.external_id,
-          pop_id: node.map_pop&.external_id,
+          site_id: node.site&.external_id,
           label: node.label,
           node_kind: node.node_kind,
           lat: node.lat,
@@ -53,8 +53,8 @@ module NetworkProjects
       @project.network_cables.order(:id).map do |cable|
         {
           id: cable.external_id,
-          source_pop_id: cable.source_pop&.external_id,
-          target_pop_id: cable.target_pop&.external_id,
+          source_site_id: cable.source_site&.external_id,
+          target_site_id: cable.target_site&.external_id,
           source_node_id: cable.source_node&.external_id,
           target_node_id: cable.target_node&.external_id,
           color: cable.color,

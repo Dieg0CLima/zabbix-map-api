@@ -71,8 +71,8 @@ class Api::V1::NetworkCablesController < ApplicationController
   def permitted_network_cable_payload
     @permitted_network_cable_payload ||= params.require(:network_cable).permit(
       :external_id,
-      :source_pop_id,
-      :target_pop_id,
+      :source_site_id,
+      :target_site_id,
       :source_node_id,
       :target_node_id,
       :label,
@@ -89,7 +89,7 @@ class Api::V1::NetworkCablesController < ApplicationController
   end
 
   def filter_params
-    params.permit(:status, :cable_type, :network_role, :source_pop_id, :target_pop_id, :q, :fiber_count_min, :fiber_count_max)
+    params.permit(:status, :cable_type, :network_role, :source_site_id, :target_site_id, :q, :fiber_count_min, :fiber_count_max)
   end
 
   def cable_payload(cable)
