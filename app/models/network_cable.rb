@@ -5,8 +5,8 @@ class NetworkCable < ApplicationRecord
 
   belongs_to :network_map
 
-  belongs_to :source_pop, class_name: "MapPop", optional: true
-  belongs_to :target_pop, class_name: "MapPop", optional: true
+  belongs_to :source_site, class_name: "Site", optional: true
+  belongs_to :target_site, class_name: "Site", optional: true
 
   belongs_to :source_node, class_name: "MapNode", inverse_of: :outgoing_cables, optional: true
   belongs_to :target_node, class_name: "MapNode", inverse_of: :incoming_cables, optional: true
@@ -14,9 +14,9 @@ class NetworkCable < ApplicationRecord
   has_many :network_cable_points, dependent: :destroy
   has_many :network_cable_events, dependent: :destroy
 
-  before_validation :resolve_pop_external_ids
+  before_validation :resolve_site_external_ids
   before_validation :apply_default_visuals
-  before_validation :derive_pops_from_nodes
+  before_validation :derive_sites_from_nodes
 
   validates :external_id, presence: true, uniqueness: { scope: :network_map_id }
   validates :pattern, inclusion: { in: PATTERNS }
@@ -39,27 +39,27 @@ class NetworkCable < ApplicationRecord
 
   validate :source_binding_required
   validate :endpoints_must_belong_to_the_same_map
-  validate :nodes_must_match_bound_pops
-  validate :source_pop_external_id_must_exist
-  validate :target_pop_external_id_must_exist
+  validate :nodes_must_match_bound_sites
+  validate :source_site_external_id_must_exist
+  validate :target_site_external_id_must_exist
   validate :fiber_count_must_be_positive_integer
 
-  def source_pop_id=(value)
-    @source_pop_external_id = nil
+  def source_site_id=(value)
+    @source_site_external_id = nil
 
     if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
-      @source_pop_external_id = value
+      @source_site_external_id = value
       return super(nil)
     end
 
     super(value)
   end
 
-  def target_pop_id=(value)
-    @target_pop_external_id = nil
+  def target_site_id=(value)
+    @target_site_external_id = nil
 
     if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
-      @target_pop_external_id = value
+      @target_site_external_id = value
       return super(nil)
     end
 
@@ -77,33 +77,33 @@ class NetworkCable < ApplicationRecord
     self.status ||= "planned"
   end
 
-  def resolve_pop_external_ids
+  def resolve_site_external_ids
     return if network_map.blank?
 
-    if @source_pop_external_id.present?
-      self.source_pop = network_map.map_pops.find_by(external_id: @source_pop_external_id)
+    if @source_site_external_id.present?
+      self.source_site = network_map.sites.find_by(external_id: @source_site_external_id)
     end
 
-    if @target_pop_external_id.present?
-      self.target_pop = network_map.map_pops.find_by(external_id: @target_pop_external_id)
+    if @target_site_external_id.present?
+      self.target_site = network_map.sites.find_by(external_id: @target_site_external_id)
     end
   end
 
-  def derive_pops_from_nodes
-    self.source_pop ||= source_node&.map_pop
-    self.target_pop ||= target_node&.map_pop
+  def derive_sites_from_nodes
+    self.source_site ||= source_node&.site
+    self.target_site ||= target_node&.site
   end
 
   def source_binding_required
-    return if source_pop_id.present? || source_node_id.present?
+    return if source_site_id.present? || source_node_id.present?
 
-    errors.add(:source_pop_id, "é obrigatório")
+    errors.add(:source_site_id, "é obrigatório")
   end
 
   def endpoints_must_belong_to_the_same_map
     return if network_map.blank?
 
-    [source_pop, target_pop, source_node, target_node].compact.each do |record|
+    [source_site, target_site, source_node, target_node].compact.each do |record|
       next if record.network_map_id == network_map_id
 
       errors.add(:base, "all endpoints must belong to the same network map")
@@ -111,26 +111,26 @@ class NetworkCable < ApplicationRecord
     end
   end
 
-  def nodes_must_match_bound_pops
-    if source_node.present? && source_pop.present? && source_node.map_pop_id != source_pop_id
-      errors.add(:source_node, "must belong to source_pop")
+  def nodes_must_match_bound_sites
+    if source_node.present? && source_site.present? && source_node.site_id != source_site_id
+      errors.add(:source_node, "must belong to source_site")
     end
 
-    if target_node.present? && target_pop.present? && target_node.map_pop_id != target_pop_id
-      errors.add(:target_node, "must belong to target_pop")
+    if target_node.present? && target_site.present? && target_node.site_id != target_site_id
+      errors.add(:target_node, "must belong to target_site")
     end
   end
 
-  def source_pop_external_id_must_exist
-    return if @source_pop_external_id.blank? || source_pop.present?
+  def source_site_external_id_must_exist
+    return if @source_site_external_id.blank? || source_site.present?
 
-    errors.add(:source_pop_id, "must reference an existing pop external_id")
+    errors.add(:source_site_id, "must reference an existing site external_id")
   end
 
-  def target_pop_external_id_must_exist
-    return if @target_pop_external_id.blank? || target_pop.present?
+  def target_site_external_id_must_exist
+    return if @target_site_external_id.blank? || target_site.present?
 
-    errors.add(:target_pop_id, "must reference an existing pop external_id")
+    errors.add(:target_site_id, "must reference an existing site external_id")
   end
 
   def fiber_count_must_be_positive_integer

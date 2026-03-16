@@ -22,7 +22,7 @@ class Api::V1::NetworkMapEditorStatesController < ApplicationController
   private
 
   def set_network_map
-    @network_map = scoped_network_maps.includes(:map_pops, map_nodes: :map_pop, network_cables: :network_cable_points).find(params[:network_map_id])
+    @network_map = scoped_network_maps.includes(:sites, map_nodes: :site, network_cables: :network_cable_points).find(params[:network_map_id])
   end
 
   def editor_payload(network_map)

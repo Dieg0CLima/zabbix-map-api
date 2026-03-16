@@ -20,20 +20,24 @@ class MapNodes::ZabbixHostLinkerTest < ActiveSupport::TestCase
     assert_equal "10658", linked[:zabbix_ref]
   end
 
-  test "creates placeholder host when hostid is not synced locally" do
-    organization = Organization.create!(name: "Org Linker Placeholder")
+  test "nils out zabbix_host_id and preserves zabbix_ref when hostid is not synced locally" do
+    organization = Organization.create!(name: "Org Linker Not Found")
     connection = organization.zabbix_connections.create!(
-      name: "Conn Placeholder",
+      name: "Conn Not Found",
       status: "active",
       connection_mode: "api",
       base_url: "https://zabbix.local"
     )
-    network_map = organization.network_maps.create!(name: "Mapa Placeholder", source_type: "manual", zabbix_connection: connection)
+    network_map = organization.network_maps.create!(name: "Mapa Not Found", source_type: "manual", zabbix_connection: connection)
 
-    linked = MapNodes::ZabbixHostLinker.new(network_map: network_map, payload: { zabbix_host_id: "99999" }).call
+    # Simulates db mode: host "99999" exists in Zabbix but is not in local zabbix_hosts table.
+    payload = { zabbix_host_id: "99999", label: "Node" }
+    linked = MapNodes::ZabbixHostLinker.new(network_map: network_map, payload: payload).call
 
-    created_host = connection.zabbix_hosts.find_by(hostid: "99999")
-    assert created_host.present?
-    assert_equal created_host.id, linked[:zabbix_host_id]
+    # FK is nulled to avoid PG::ForeignKeyViolation; soft reference is preserved.
+    assert_nil linked[:zabbix_host_id], "zabbix_host_id must be nil to avoid FK violation"
+    assert_equal "99999", linked[:zabbix_ref], "zabbix_ref must be preserved for display"
+    assert connection.zabbix_hosts.find_by(hostid: "99999").blank?,
+           "No placeholder host should be created silently"
   end
 end

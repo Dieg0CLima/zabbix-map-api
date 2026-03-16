@@ -10,7 +10,7 @@ class NetworkMaps::EditorStatePayloadBuilder
       history_label: latest_snapshot&.label,
       history_index: latest_state["history_index"],
       draft_cable: latest_state["draft_cable"],
-      pops: pop_payload,
+      sites: site_payload,
       markers: marker_payload,
       edges: edge_payload,
       snapshots: snapshots_payload
@@ -27,15 +27,17 @@ class NetworkMaps::EditorStatePayloadBuilder
     latest_snapshot&.state || {}
   end
 
-  def pop_payload
-    @network_map.map_pops.order(:id).map do |pop|
+  def site_payload
+    @network_map.sites.order(:id).map do |site|
       {
-        id: pop.external_id,
-        name: pop.name,
-        lat: pop.lat.to_f,
-        lng: pop.lng.to_f,
-        color: pop.color,
-        metadata: pop.metadata
+        id: site.external_id,
+        name: site.name,
+        lat: site.lat.to_f,
+        lng: site.lng.to_f,
+        color: site.color,
+        address: site.address,
+        status: site.status,
+        metadata: site.metadata
       }
     end
   end
@@ -44,7 +46,7 @@ class NetworkMaps::EditorStatePayloadBuilder
     @network_map.map_nodes.order(:id).map do |node|
       {
         id: node.external_id,
-        pop_id: node.map_pop&.external_id,
+        site_id: node.site&.external_id,
         label: node.label,
         node_kind: node.node_kind,
         lat: node.lat.to_f,
@@ -65,8 +67,8 @@ class NetworkMaps::EditorStatePayloadBuilder
         label: cable.label,
         cable_type: cable.cable_type,
         status: cable.status,
-        source_pop_id: cable.source_pop&.external_id,
-        target_pop_id: cable.target_pop&.external_id,
+        source_site_id: cable.source_site&.external_id,
+        target_site_id: cable.target_site&.external_id,
         source_node_id: cable.source_node&.external_id,
         target_node_id: cable.target_node&.external_id,
         color: cable.color,

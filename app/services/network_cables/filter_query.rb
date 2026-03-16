@@ -9,8 +9,8 @@ class NetworkCables::FilterQuery
     filter_by_status
     filter_by_cable_type
     filter_by_network_role
-    filter_by_source_pop
-    filter_by_target_pop
+    filter_by_source_site
+    filter_by_target_site
     filter_by_search_query
     filter_by_fiber_count_min
     filter_by_fiber_count_max
@@ -38,16 +38,16 @@ class NetworkCables::FilterQuery
     @scope = @scope.where("metadata ->> 'network_role' = ?", @params[:network_role])
   end
 
-  def filter_by_source_pop
-    return unless @params[:source_pop_id].present?
+  def filter_by_source_site
+    return unless @params[:source_site_id].present?
 
-    @scope = @scope.where(source_pop_id: resolve_pop_id(@params[:source_pop_id]))
+    @scope = @scope.where(source_site_id: resolve_site_id(@params[:source_site_id]))
   end
 
-  def filter_by_target_pop
-    return unless @params[:target_pop_id].present?
+  def filter_by_target_site
+    return unless @params[:target_site_id].present?
 
-    @scope = @scope.where(target_pop_id: resolve_pop_id(@params[:target_pop_id]))
+    @scope = @scope.where(target_site_id: resolve_site_id(@params[:target_site_id]))
   end
 
   def filter_by_search_query
@@ -69,9 +69,9 @@ class NetworkCables::FilterQuery
     @scope = @scope.where("(metadata ->> 'fiber_count')::int <= ?", @params[:fiber_count_max].to_i)
   end
 
-  def resolve_pop_id(value)
+  def resolve_site_id(value)
     return value if value.to_s.match?(/\A\d+\z/)
 
-    @network_map.map_pops.find_by(external_id: value)&.id
+    @network_map.sites.find_by(external_id: value)&.id
   end
 end

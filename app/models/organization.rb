@@ -3,6 +3,8 @@ class Organization < ApplicationRecord
   has_many :users, through: :memberships
   has_many :network_maps, dependent: :destroy
   has_many :zabbix_connections, dependent: :destroy
+  has_many :sites, through: :network_maps
+  has_many :devices, dependent: :destroy
 
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true

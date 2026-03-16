@@ -7,7 +7,7 @@ class Api::V1::NetworkProjectsController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy save]
 
   def index
-    projects = scoped_network_maps.includes(:map_pops, :map_nodes, network_cables: :network_cable_points)
+    projects = scoped_network_maps.includes(:sites, :map_nodes, network_cables: :network_cable_points)
 
     render json: { data: projects.map { |project| project_payload(project) } }, status: :ok
   end

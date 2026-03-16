@@ -8,7 +8,7 @@ class Api::V1::MapNodesController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
-    nodes = @network_map.map_nodes.includes(:map_pop).order(:id)
+    nodes = @network_map.map_nodes.includes(:site).order(:id)
     render json: { data: nodes.map { |node| map_node_payload(node) } }, status: :ok
   end
 
@@ -56,14 +56,14 @@ class Api::V1::MapNodesController < ApplicationController
     @map_node = @network_map.map_nodes.find_by(external_id: params[:id])
     return if @map_node.present?
 
-    @map_node = @network_map.map_nodes.includes(:map_pop).find(params[:id]) if params[:id].to_s.match?(/\A\d+\z/)
+    @map_node = @network_map.map_nodes.includes(:site).find(params[:id]) if params[:id].to_s.match?(/\A\d+\z/)
     raise ActiveRecord::RecordNotFound if @map_node.blank?
   end
 
   def permitted_map_node_payload
     @permitted_map_node_payload ||= params.require(:map_node).permit(
       :external_id,
-      :map_pop_id,
+      :site_id,
       :label,
       :node_kind,
       :x,
@@ -73,8 +73,12 @@ class Api::V1::MapNodesController < ApplicationController
       :icon,
       :color,
       :size,
+      :device_id,
       :zabbix_ref,
       :zabbix_host_id,
+      :hostname,
+      :ip_address,
+      :description,
       metadata: {}
     )
   end
