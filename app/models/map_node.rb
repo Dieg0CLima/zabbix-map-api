@@ -4,6 +4,7 @@ class MapNode < ApplicationRecord
   belongs_to :network_map
   belongs_to :map_pop, optional: true
   belongs_to :zabbix_host, class_name: "Zabbix::Host", optional: true
+  belongs_to :device, optional: true
 
   has_many :map_node_items, dependent: :destroy
 

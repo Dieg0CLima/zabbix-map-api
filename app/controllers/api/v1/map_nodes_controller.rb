@@ -73,6 +73,7 @@ class Api::V1::MapNodesController < ApplicationController
       :icon,
       :color,
       :size,
+      :device_id,
       :zabbix_ref,
       :zabbix_host_id,
       :hostname,

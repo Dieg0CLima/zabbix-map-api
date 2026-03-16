@@ -18,6 +18,7 @@ class MapNodes::PayloadBuilder
       icon: @map_node.icon,
       color: @map_node.color,
       size: @map_node.size,
+      device_id: @map_node.device_id,
       zabbix_ref: @map_node.zabbix_ref,
       zabbix_host_id: @map_node.zabbix_host_id,
       hostname: @map_node.hostname,

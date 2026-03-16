@@ -13,6 +13,7 @@ module MapPops
         lat: @pop.lat,
         lng: @pop.lng,
         color: @pop.color,
+        site_id: @pop.site_id,
         metadata: @pop.metadata,
         created_at: @pop.created_at,
         updated_at: @pop.updated_at

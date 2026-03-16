@@ -29,6 +29,9 @@ Rails.application.routes.draw do
         get "metrics/events", to: "network_map_metrics#events"
       end
 
+      resources :sites
+      resources :devices
+
       resources :zabbix_connections do
         resources :zabbix_hosts, only: :index do
           collection do

@@ -1,5 +1,6 @@
 class MapPop < ApplicationRecord
   belongs_to :network_map
+  belongs_to :site, optional: true
 
   before_validation :apply_defaults
 
