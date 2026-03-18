@@ -3,7 +3,7 @@ class CreateMapElements < ActiveRecord::Migration[8.0]
   # It stores only visual/layout context specific to one map.
   # The entity itself (Site or Device) lives in its own table.
   def change
-    create_table :map_elements do |t|
+    create_table :map_elements, if_not_exists: true do |t|
       t.references :network_map, null: false, foreign_key: true
 
       # Polymorphic reference to the domain entity (Site, Device, or future types)
@@ -35,14 +35,16 @@ class CreateMapElements < ActiveRecord::Migration[8.0]
     add_index :map_elements,
               %i[network_map_id external_id],
               unique: true,
-              name: "index_map_elements_on_network_map_id_and_external_id"
+              name: "index_map_elements_on_network_map_id_and_external_id",
+              if_not_exists: true
 
     # Each domain entity can appear at most once per map
     add_index :map_elements,
               %i[network_map_id mappable_type mappable_id],
               unique: true,
-              name: "index_map_elements_on_map_and_mappable"
+              name: "index_map_elements_on_map_and_mappable",
+              if_not_exists: true
 
-    add_index :map_elements, %i[mappable_type mappable_id]
+    add_index :map_elements, %i[mappable_type mappable_id], if_not_exists: true
   end
 end
