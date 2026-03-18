@@ -46,10 +46,14 @@ class Api::V1::SitesController < Api::V1::BaseController
   end
 
   def site_params
-    params.require(:site).permit(:name, :slug, :description, :address, :city, :state, :lat, :lng, metadata: {})
+    raw = params.require(:site)
+    raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
+    raw.permit(:name, :slug, :description, :address, :city, :state, :lat, :lng, metadata: {})
   end
 
   def map_context_params
-    params.fetch(:map_context, ActionController::Parameters.new).permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
+    raw = params.fetch(:map_context, ActionController::Parameters.new)
+    raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
+    raw.permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
   end
 end

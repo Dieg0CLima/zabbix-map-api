@@ -58,10 +58,14 @@ class Api::V1::DevicesController < Api::V1::BaseController
   end
 
   def device_params
-    params.require(:device).permit(:site_id, :name, :hostname, :role, :vendor, :model, :serial_number, :management_ip, :status, metadata: {})
+    raw = params.require(:device)
+    raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
+    raw.permit(:site_id, :name, :hostname, :role, :vendor, :model, :serial_number, :management_ip, :status, metadata: {})
   end
 
   def map_context_params
-    params.fetch(:map_context, ActionController::Parameters.new).permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
+    raw = params.fetch(:map_context, ActionController::Parameters.new)
+    raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
+    raw.permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
   end
 end

@@ -19,6 +19,8 @@ class Devices::CreateDevice
   def device_attributes
     attrs = @params.deep_dup
     attrs[:metadata] = (attrs[:metadata] || {}).merge("created_by_id" => @actor&.id)
+    attrs[:external_id] ||= "device-#{SecureRandom.uuid}" if Device.attribute_names.include?("external_id")
+    attrs[:status] ||= "active" if Device.attribute_names.include?("status")
     attrs
   end
 

@@ -19,6 +19,9 @@ class Sites::CreateSite
   def site_attributes
     attrs = @params.deep_dup
     attrs[:metadata] = (attrs[:metadata] || {}).merge("created_by_id" => @actor&.id)
+    attrs[:external_id] ||= "site-#{SecureRandom.uuid}" if Site.attribute_names.include?("external_id")
+    attrs[:status] ||= "active" if Site.attribute_names.include?("status")
+    attrs[:site_type] ||= "pop" if Site.attribute_names.include?("site_type")
     attrs
   end
 
