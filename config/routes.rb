@@ -16,17 +16,28 @@ Rails.application.routes.draw do
         end
       end
 
+      # Domain entities (canonical records shared across maps and documentation)
+      resources :sites
+      resources :devices
+
       resources :network_maps do
-        resources :map_pops
-        resources :map_nodes do
-          resources :map_node_items, only: %i[index create destroy]
+        # New domain model: polymorphic map elements (Site/Device references + visual context)
+        resources :map_elements do
+          resources :map_element_items, only: %i[index create destroy]
         end
+
         resources :network_cables do
           resources :events, controller: "network_cable_events", only: :index
         end
         resource :editor_state, controller: "network_map_editor_states", only: %i[show update]
         resource :metrics, controller: "network_map_metrics", only: :show
         get "metrics/events", to: "network_map_metrics#events"
+
+        # Legacy endpoints kept for backward compatibility during transition
+        resources :map_pops
+        resources :map_nodes do
+          resources :map_node_items, only: %i[index create destroy]
+        end
       end
 
       resources :zabbix_connections do

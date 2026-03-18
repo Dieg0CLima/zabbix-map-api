@@ -7,10 +7,19 @@ module EditorStateParams
       :history_label,
       :history_index,
       draft_cable: {},
-      pops: [ :id, :name, :lat, :lng, :color, { metadata: {} } ],
-      markers: [ :id, :label, :node_kind, :lat, :lng, :icon, :color, :size, :zabbix_ref, :pop_id, { metadata: {} } ],
-      edges: [ :id, :label, :cable_type, :status, :color, :weight, :pattern, :source_pop_id, :target_pop_id, :source_node_id, :target_node_id,
-               { metadata: {} }, { points: [ :position, :lat, :lng ] } ]
+      elements: [
+        :id, :mappable_type, :mappable_id,
+        :lat, :lng,
+        :icon_override, :color_override, :label_override, :size_override,
+        :collapsed, :display_order,
+        { metadata: {} }
+      ],
+      edges: [
+        :id, :label, :cable_type, :status, :color, :weight, :pattern,
+        :source_element_id, :target_element_id,
+        { metadata: {} },
+        { points: [ :position, :lat, :lng ] }
+      ]
     )
   end
 end

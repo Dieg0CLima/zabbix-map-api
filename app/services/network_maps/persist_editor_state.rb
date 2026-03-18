@@ -1,21 +1,31 @@
 class NetworkMaps::PersistEditorState
-  # Service responsible for applying a full editor snapshot using incremental upserts.
+  # Applies a full editor snapshot using incremental upserts.
   #
   # Key guarantees:
-  # - no destroy_all (preserves control over FK order and avoids mass callback storms)
-  # - stable internal IDs for records matched by external_id
-  # - explicit validation when payload references missing external_ids
-  # - stale records are removed in FK-safe order (cables -> nodes -> pops)
-  # - all operations run in a single transaction with row lock on network_map
+  # - no destroy_all (preserves control over FK order)
+  # - stable internal IDs matched by external_id
+  # - stale records removed in FK-safe order (cables → elements)
+  # - all operations in a single transaction with row lock on network_map
+  #
+  # Payload format expected:
+  #   {
+  #     active_base_layer: "standard"|"terrain"|"dark",
+  #     history_label: "...",
+  #     history_index: 0,
+  #     draft_cable: {...} | null,
+  #     elements: [ { id: external_id, mappable_type: "Site"|"Device", mappable_id: int,
+  #                   lat:, lng:, label_override:, icon_override:, color_override:,
+  #                   size_override:, collapsed:, display_order:, metadata: } ],
+  #     edges: [ { id: external_id, source_element_id: ext_id, target_element_id: ext_id,
+  #                label:, cable_type:, status:, color:, weight:, pattern:, metadata:,
+  #                points: [{position:, lat:, lng:}] } ]
+  #   }
   def initialize(network_map:, payload:)
     @network_map = network_map
     @payload = payload
 
-    @pop_by_external_id = {}
-    @node_by_external_id = {}
-
-    @sanitized_pops = []
-    @sanitized_nodes = []
+    @element_by_external_id = {}
+    @sanitized_elements = []
     @sanitized_cables = []
   end
 
@@ -25,11 +35,8 @@ class NetworkMaps::PersistEditorState
 
       validate_payload_uniqueness!
       update_map!
-
-      upsert_pops!
-      upsert_nodes!
+      upsert_elements!
       upsert_cables!
-
       cleanup_stale_records!
       create_snapshot!
     end
@@ -45,52 +52,28 @@ class NetworkMaps::PersistEditorState
     )
   end
 
-  def upsert_pops!
-    existing = @network_map.map_pops.index_by(&:external_id)
+  def upsert_elements!
+    existing = @network_map.map_elements.index_by(&:external_id)
     payload_external_ids = []
 
-    pops_payload.each do |pop|
-      external_id = pop[:id].to_s
+    elements_payload.each do |elem|
+      external_id = elem[:id].to_s
       payload_external_ids << external_id
 
-      record = existing[external_id] || @network_map.map_pops.new(external_id:)
-      record.assign_attributes(
-        name: pop[:name],
-        lat: pop[:lat],
-        lng: pop[:lng],
-        color: pop[:color],
-        metadata: sanitize_metadata(pop[:metadata])
+      record = existing[external_id] || @network_map.map_elements.new(
+        external_id:    external_id,
+        mappable_type:  elem[:mappable_type],
+        mappable_id:    elem[:mappable_id]
       )
+
+      record.assign_attributes(build_element_attrs(elem))
       record.save!
 
-      @pop_by_external_id[external_id] = record
-      @sanitized_pops << sanitized_pop_payload(record)
+      @element_by_external_id[external_id] = record
+      @sanitized_elements << sanitized_element_payload(record)
     end
 
-    @stale_pop_external_ids = existing.keys - payload_external_ids
-  end
-
-  def upsert_nodes!
-    existing = @network_map.map_nodes.index_by(&:external_id)
-    @existing_nodes_by_external_id = existing
-    payload_external_ids = []
-
-    nodes_payload.each do |node|
-      external_id = node[:id].to_s
-      payload_external_ids << external_id
-
-      map_pop = resolve_pop!(node[:pop_id], field: :pop_id)
-      attrs = build_node_attrs(node, map_pop)
-
-      record = existing[external_id] || @network_map.map_nodes.new(external_id:)
-      record.assign_attributes(attrs)
-      record.save!
-
-      @node_by_external_id[external_id] = record
-      @sanitized_nodes << sanitized_node_payload(record)
-    end
-
-    @stale_node_external_ids = existing.keys - payload_external_ids
+    @stale_element_external_ids = existing.keys - payload_external_ids
   end
 
   def upsert_cables!
@@ -101,22 +84,21 @@ class NetworkMaps::PersistEditorState
       external_id = cable[:id].to_s
       payload_external_ids << external_id
 
-      resolved = resolve_cable_endpoints!(cable)
+      source_element = resolve_element!(cable[:source_element_id], field: :source_element_id)
+      target_element = resolve_element!(cable[:target_element_id], field: :target_element_id)
       points = sanitize_points!(cable[:points])
 
       record = existing[external_id] || @network_map.network_cables.new(external_id:)
       record.assign_attributes(
-        label: cable[:label],
-        cable_type: cable[:cable_type] || "manual",
-        status: cable[:status] || "planned",
-        color: cable[:color],
-        weight: cable[:weight],
-        pattern: cable[:pattern],
-        source_pop: resolved[:source_pop],
-        target_pop: resolved[:target_pop],
-        source_node: resolved[:source_node],
-        target_node: resolved[:target_node],
-        metadata: sanitize_metadata(cable[:metadata])
+        label:          cable[:label],
+        cable_type:     cable[:cable_type] || "manual",
+        status:         cable[:status] || "planned",
+        color:          cable[:color],
+        weight:         cable[:weight],
+        pattern:        cable[:pattern],
+        source_element: source_element,
+        target_element: target_element,
+        metadata:       sanitize_metadata(cable[:metadata])
       )
       record.save!
 
@@ -128,21 +110,18 @@ class NetworkMaps::PersistEditorState
   end
 
   def cleanup_stale_records!
-    # 1) Cables first (depend on nodes/pops). We delete points directly for performance.
+    # Cables first (depend on elements)
     stale_cables = @network_map.network_cables.where(external_id: @stale_cable_external_ids)
     stale_cable_ids = stale_cables.pluck(:id)
 
     if stale_cable_ids.any?
       NetworkCablePoint.where(network_cable_id: stale_cable_ids).delete_all
-      NetworkCableEvent.where(network_cable_id: stale_cable_ids).delete_all if defined?(NetworkCableEvent)
+      NetworkCableEvent.where(network_cable_id: stale_cable_ids).delete_all
       stale_cables.delete_all
     end
 
-    # 2) Nodes next (depend on pops).
-    @network_map.map_nodes.where(external_id: @stale_node_external_ids).delete_all
-
-    # 3) Pops last.
-    @network_map.map_pops.where(external_id: @stale_pop_external_ids).delete_all
+    # Elements (no further dependents after cables are removed)
+    @network_map.map_elements.where(external_id: @stale_element_external_ids).delete_all
   end
 
   def replace_points!(cable, points)
@@ -151,8 +130,8 @@ class NetworkMaps::PersistEditorState
     points.each do |point|
       cable.network_cable_points.create!(
         position: point[:position],
-        x: point[:lat],
-        y: point[:lng]
+        x:        point[:lat],
+        y:        point[:lng]
       )
     end
   end
@@ -162,18 +141,16 @@ class NetworkMaps::PersistEditorState
       label: @payload[:history_label].presence || "Autosave",
       state: {
         active_base_layer: @network_map.active_base_layer,
-        pops: @sanitized_pops,
-        markers: @sanitized_nodes,
-        edges: @sanitized_cables,
-        draft_cable: sanitize_draft_cable(@payload[:draft_cable]),
-        history_index: @payload[:history_index]
+        elements:          @sanitized_elements,
+        edges:             @sanitized_cables,
+        draft_cable:       sanitize_draft_cable(@payload[:draft_cable]),
+        history_index:     @payload[:history_index]
       }
     )
   end
 
   def validate_payload_uniqueness!
-    assert_unique_external_ids!(pops_payload, :id, :pops)
-    assert_unique_external_ids!(nodes_payload, :id, :markers)
+    assert_unique_external_ids!(elements_payload, :id, :elements)
     assert_unique_external_ids!(cables_payload, :id, :edges)
   end
 
@@ -187,43 +164,23 @@ class NetworkMaps::PersistEditorState
     )
   end
 
-  def resolve_pop!(external_id, field:)
+  def resolve_element!(external_id, field:)
     return nil if external_id.blank?
 
-    pop = @pop_by_external_id[external_id.to_s]
-    return pop if pop.present?
+    element = @element_by_external_id[external_id.to_s]
+    return element if element.present?
 
     raise ActiveRecord::RecordInvalid.new(
-      build_error_record(field => "POP '#{external_id}' não encontrado no payload/mapa")
+      build_error_record(field => "Element '#{external_id}' não encontrado no payload/mapa")
     )
-  end
-
-  def resolve_node!(external_id, field:)
-    return nil if external_id.blank?
-
-    node = @node_by_external_id[external_id.to_s] || @existing_nodes_by_external_id[external_id.to_s]
-    return node if node.present?
-
-    raise ActiveRecord::RecordInvalid.new(
-      build_error_record(field => "Node '#{external_id}' não encontrado no payload/mapa")
-    )
-  end
-
-  def resolve_cable_endpoints!(cable)
-    {
-      source_pop: resolve_pop!(cable[:source_pop_id], field: :source_pop_id),
-      target_pop: resolve_pop!(cable[:target_pop_id], field: :target_pop_id),
-      source_node: resolve_node!(cable[:source_node_id], field: :source_node_id),
-      target_node: resolve_node!(cable[:target_node_id], field: :target_node_id)
-    }
   end
 
   def sanitize_points!(points_payload)
     points = Array(points_payload).map.with_index do |point, index|
       {
         position: point[:position] || index,
-        lat: point[:lat],
-        lng: point[:lng]
+        lat:      point[:lat],
+        lng:      point[:lng]
       }
     end
 
@@ -234,25 +191,19 @@ class NetworkMaps::PersistEditorState
     points.sort_by { |point| point[:position].to_i }
   end
 
-  def build_node_attrs(node, map_pop)
-    lat = node[:lat]
-    lng = node[:lng]
-
-    # map_nodes still has required x/y columns. We store lat/lng as canonical values
-    # and mirror them into x/y strictly for legacy schema compatibility.
+  def build_element_attrs(elem)
     {
-      map_pop:,
-      label: node[:label],
-      node_kind: node[:node_kind] || "switch",
-      lat:,
-      lng:,
-      x: lat,
-      y: lng,
-      icon: node[:icon],
-      color: node[:color],
-      size: node[:size],
-      zabbix_ref: node[:zabbix_ref],
-      metadata: sanitize_metadata(node[:metadata])
+      mappable_type:  elem[:mappable_type],
+      mappable_id:    elem[:mappable_id],
+      lat:            elem[:lat],
+      lng:            elem[:lng],
+      icon_override:  elem[:icon_override],
+      color_override: elem[:color_override],
+      label_override: elem[:label_override],
+      size_override:  elem[:size_override],
+      collapsed:      elem[:collapsed] || false,
+      display_order:  elem[:display_order] || 0,
+      metadata:       sanitize_metadata(elem[:metadata])
     }
   end
 
@@ -266,48 +217,23 @@ class NetworkMaps::PersistEditorState
     draft_cable.deep_dup
   end
 
-  def sanitized_pop_payload(pop)
-    {
-      id: pop.external_id,
-      name: pop.name,
-      lat: pop.lat,
-      lng: pop.lng,
-      color: pop.color,
-      metadata: sanitize_metadata(pop.metadata)
-    }
-  end
-
-  def sanitized_node_payload(node)
-    {
-      id: node.external_id,
-      pop_id: node.map_pop&.external_id,
-      label: node.label,
-      node_kind: node.node_kind,
-      lat: node.lat,
-      lng: node.lng,
-      icon: node.icon,
-      color: node.color,
-      size: node.size,
-      zabbix_ref: node.zabbix_ref,
-      metadata: sanitize_metadata(node.metadata)
-    }
+  def sanitized_element_payload(element)
+    MapElements::PayloadBuilder.new(map_element: element).call
   end
 
   def sanitized_cable_payload(cable, points)
     {
-      id: cable.external_id,
-      label: cable.label,
-      cable_type: cable.cable_type,
-      status: cable.status,
-      source_pop_id: cable.source_pop&.external_id,
-      target_pop_id: cable.target_pop&.external_id,
-      source_node_id: cable.source_node&.external_id,
-      target_node_id: cable.target_node&.external_id,
-      color: cable.color,
-      weight: cable.weight,
-      pattern: cable.pattern,
-      metadata: sanitize_metadata(cable.metadata),
-      points:
+      id:                cable.external_id,
+      label:             cable.label,
+      cable_type:        cable.cable_type,
+      status:            cable.status,
+      source_element_id: cable.source_element&.external_id,
+      target_element_id: cable.target_element&.external_id,
+      color:             cable.color,
+      weight:            cable.weight,
+      pattern:           cable.pattern,
+      metadata:          sanitize_metadata(cable.metadata),
+      points:            points
     }
   end
 
@@ -317,12 +243,8 @@ class NetworkMaps::PersistEditorState
     end
   end
 
-  def pops_payload
-    Array(@payload[:pops])
-  end
-
-  def nodes_payload
-    Array(@payload[:markers])
+  def elements_payload
+    Array(@payload[:elements])
   end
 
   def cables_payload

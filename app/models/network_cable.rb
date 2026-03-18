@@ -5,15 +5,20 @@ class NetworkCable < ApplicationRecord
 
   belongs_to :network_map
 
+  # New domain model: cables connect MapElements
+  belongs_to :source_element, class_name: "MapElement", optional: true
+  belongs_to :target_element, class_name: "MapElement", optional: true
+
+  # Legacy: kept during migration
   belongs_to :source_pop, class_name: "MapPop", optional: true
   belongs_to :target_pop, class_name: "MapPop", optional: true
-
   belongs_to :source_node, class_name: "MapNode", inverse_of: :outgoing_cables, optional: true
   belongs_to :target_node, class_name: "MapNode", inverse_of: :incoming_cables, optional: true
 
   has_many :network_cable_points, dependent: :destroy
   has_many :network_cable_events, dependent: :destroy
 
+  before_validation :resolve_element_external_ids
   before_validation :resolve_pop_external_ids
   before_validation :apply_default_visuals
   before_validation :derive_pops_from_nodes
@@ -44,6 +49,28 @@ class NetworkCable < ApplicationRecord
   validate :target_pop_external_id_must_exist
   validate :fiber_count_must_be_positive_integer
 
+  def source_element_id=(value)
+    @source_element_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @source_element_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
+
+  def target_element_id=(value)
+    @target_element_external_id = nil
+
+    if value.is_a?(String) && value.present? && !value.match?(/\A\d+\z/)
+      @target_element_external_id = value
+      return super(nil)
+    end
+
+    super(value)
+  end
+
   def source_pop_id=(value)
     @source_pop_external_id = nil
 
@@ -67,6 +94,18 @@ class NetworkCable < ApplicationRecord
   end
 
   private
+
+  def resolve_element_external_ids
+    return if network_map.blank?
+
+    if @source_element_external_id.present?
+      self.source_element = network_map.map_elements.find_by(external_id: @source_element_external_id)
+    end
+
+    if @target_element_external_id.present?
+      self.target_element = network_map.map_elements.find_by(external_id: @target_element_external_id)
+    end
+  end
 
   def apply_default_visuals
     self.external_id ||= "cable-#{SecureRandom.uuid}"
@@ -95,13 +134,21 @@ class NetworkCable < ApplicationRecord
   end
 
   def source_binding_required
-    return if source_pop_id.present? || source_node_id.present?
+    return if source_element_id.present? || source_pop_id.present? || source_node_id.present?
 
-    errors.add(:source_pop_id, "é obrigatório")
+    errors.add(:source_element_id, "é obrigatório")
   end
 
   def endpoints_must_belong_to_the_same_map
     return if network_map.blank?
+
+    element_endpoints = [source_element, target_element].compact
+    element_endpoints.each do |elem|
+      next if elem.network_map_id == network_map_id
+
+      errors.add(:base, "all endpoints must belong to the same network map")
+      return
+    end
 
     [source_pop, target_pop, source_node, target_node].compact.each do |record|
       next if record.network_map_id == network_map_id
