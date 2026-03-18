@@ -2,8 +2,13 @@ class NetworkMap < ApplicationRecord
   belongs_to :organization
   belongs_to :zabbix_connection, optional: true
 
+  # New domain model: elements are polymorphic references to Site/Device
+  has_many :map_elements, dependent: :destroy
+
+  # Legacy: kept during migration, will be removed after cutover
   has_many :map_pops, dependent: :destroy
   has_many :map_nodes, dependent: :destroy
+
   has_many :network_cables, dependent: :destroy
   has_many :network_map_snapshots, dependent: :destroy
 
