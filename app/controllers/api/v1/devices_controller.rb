@@ -21,14 +21,14 @@ class Api::V1::DevicesController < Api::V1::BaseController
   end
 
   def create
-    device, marker = Devices::CreateDevice.new(organization: current_organization, params: device_params.to_h.symbolize_keys, map_context: map_context_params.to_h.symbolize_keys, actor: current_user).call
+    device, marker = Devices::CreateDevice.new(organization: current_organization, params: device_params.to_h.deep_symbolize_keys, map_context: map_context_params.to_h.deep_symbolize_keys, actor: current_user).call
     render_data(data: { device: Api::V1::DeviceSerializer.new(device).as_json, marker: marker && Api::V1::MapElementSerializer.new(marker).as_json }, status: :created)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
 
   def update
-    device = Devices::UpdateDevice.new(device: @device, params: device_params.to_h.symbolize_keys, actor: current_user).call
+    device = Devices::UpdateDevice.new(device: @device, params: device_params.to_h.deep_symbolize_keys, actor: current_user).call
     render_data(data: Api::V1::DeviceSerializer.new(device).as_json)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)

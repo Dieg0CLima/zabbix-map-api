@@ -19,14 +19,14 @@ class Api::V1::SitesController < Api::V1::BaseController
   end
 
   def create
-    site, marker = Sites::CreateSite.new(organization: current_organization, params: site_params.to_h.symbolize_keys, map_context: map_context_params.to_h.symbolize_keys, actor: current_user).call
+    site, marker = Sites::CreateSite.new(organization: current_organization, params: site_params.to_h.deep_symbolize_keys, map_context: map_context_params.to_h.deep_symbolize_keys, actor: current_user).call
     render_data(data: { site: Api::V1::SiteSerializer.new(site).as_json, marker: marker && Api::V1::MapElementSerializer.new(marker).as_json }, status: :created)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
 
   def update
-    site = Sites::UpdateSite.new(site: @site, params: site_params.to_h.symbolize_keys, actor: current_user).call
+    site = Sites::UpdateSite.new(site: @site, params: site_params.to_h.deep_symbolize_keys, actor: current_user).call
     render_data(data: Api::V1::SiteSerializer.new(site).as_json)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)

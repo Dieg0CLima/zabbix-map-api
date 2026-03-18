@@ -80,6 +80,6 @@ class Api::V1::MapNodesV2Controller < Api::V1::BaseController
   end
 
   def map_node_params
-    params.fetch(:map_node, params.fetch(:map_nodes_v2, ActionController::Parameters.new)).permit(:mappable_type, :mappable_id, :x, :y, :width, :height, :label_override, :color, :icon, :visible, :collapsed, :lat, :lng, metadata: {}).to_h.symbolize_keys
+    params.fetch(:map_node, ActionController::Parameters.new).permit(:mappable_type, :mappable_id, :x, :y, :width, :height, :label_override, :color, :icon, :visible, :collapsed, :lat, :lng, metadata: {}).to_h.symbolize_keys
   end
 end
