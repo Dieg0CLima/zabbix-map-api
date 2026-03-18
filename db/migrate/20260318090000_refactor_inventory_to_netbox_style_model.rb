@@ -1,8 +1,4 @@
 class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
-  class MigrationOrganization < ApplicationRecord
-    self.table_name = "organizations"
-  end
-
   class MigrationNetworkMap < ApplicationRecord
     self.table_name = "network_maps"
   end
@@ -15,10 +11,6 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
     self.table_name = "map_nodes"
   end
 
-  class MigrationZabbixConnection < ApplicationRecord
-    self.table_name = "zabbix_connections"
-  end
-
   class MigrationSite < ApplicationRecord
     self.table_name = "sites"
   end
@@ -28,87 +20,161 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
   end
 
   def up
-    create_table :sites do |t|
-      t.references :organization, null: false, foreign_key: true
-      t.string :name, null: false
-      t.string :slug, null: false
-      t.text :description
-      t.string :address
-      t.string :city
-      t.string :state
-      t.decimal :lat, precision: 10, scale: 6
-      t.decimal :lng, precision: 10, scale: 6
-      t.jsonb :metadata, null: false, default: {}
-      t.timestamps
+    ensure_sites_table!
+    ensure_devices_table!
+    ensure_device_interfaces_table!
+    ensure_network_maps_metadata!
+    ensure_map_nodes_projection_columns!
+    ensure_map_edges_table!
+    ensure_zabbix_links_table!
+    ensure_map_monitoring_bindings_table!
+
+    migrate_legacy_sites_and_devices!
+    backfill_map_node_mappables!
+    backfill_legacy_zabbix_links!
+  end
+
+  def down
+    drop_table :map_monitoring_bindings, if_exists: true
+    drop_table :zabbix_links, if_exists: true
+    drop_table :map_edges, if_exists: true
+
+    remove_column :map_nodes, :collapsed if column_exists?(:map_nodes, :collapsed)
+    remove_column :map_nodes, :visible if column_exists?(:map_nodes, :visible)
+    remove_column :map_nodes, :label_override if column_exists?(:map_nodes, :label_override)
+    remove_column :map_nodes, :height if column_exists?(:map_nodes, :height)
+    remove_column :map_nodes, :width if column_exists?(:map_nodes, :width)
+    remove_column :map_nodes, :mappable_type if column_exists?(:map_nodes, :mappable_type)
+    remove_column :map_nodes, :mappable_id if column_exists?(:map_nodes, :mappable_id)
+
+    remove_column :network_maps, :metadata if column_exists?(:network_maps, :metadata)
+
+    drop_table :device_interfaces, if_exists: true
+    drop_table :devices, if_exists: true
+    drop_table :sites, if_exists: true
+  end
+
+  private
+
+  def ensure_sites_table!
+    unless table_exists?(:sites)
+      create_table :sites do |t|
+        t.references :organization, null: false, foreign_key: true
+        t.string :name, null: false
+        t.string :slug, null: false
+        t.text :description
+        t.string :address
+        t.string :city
+        t.string :state
+        t.decimal :lat, precision: 10, scale: 6
+        t.decimal :lng, precision: 10, scale: 6
+        t.jsonb :metadata, null: false, default: {}
+        t.timestamps
+      end
     end
-    add_index :sites, [:organization_id, :slug], unique: true
-    add_index :sites, [:organization_id, :name]
 
-    create_table :devices do |t|
-      t.references :organization, null: false, foreign_key: true
-      t.references :site, null: true, foreign_key: true
-      t.string :name, null: false
-      t.string :hostname
-      t.string :role, null: false, default: "generic"
-      t.string :vendor
-      t.string :model
-      t.string :serial_number
-      t.string :management_ip
-      t.string :status, null: false, default: "active"
-      t.jsonb :metadata, null: false, default: {}
-      t.timestamps
+    add_index :sites, [:organization_id, :slug], unique: true unless index_exists?(:sites, [:organization_id, :slug], unique: true)
+    add_index :sites, [:organization_id, :name] unless index_exists?(:sites, [:organization_id, :name])
+  end
+
+  def ensure_devices_table!
+    unless table_exists?(:devices)
+      create_table :devices do |t|
+        t.references :organization, null: false, foreign_key: true
+        t.references :site, null: true, foreign_key: true
+        t.string :name, null: false
+        t.string :hostname
+        t.string :role, null: false, default: "generic"
+        t.string :vendor
+        t.string :model
+        t.string :serial_number
+        t.string :management_ip
+        t.string :status, null: false, default: "active"
+        t.jsonb :metadata, null: false, default: {}
+        t.timestamps
+      end
     end
-    add_index :devices, [:organization_id, :name]
-    add_index :devices, [:organization_id, :hostname]
-    add_index :devices, [:organization_id, :serial_number]
 
-    create_table :device_interfaces do |t|
-      t.references :device, null: false, foreign_key: true
-      t.string :name, null: false
-      t.string :interface_type
-      t.string :description
-      t.boolean :enabled, null: false, default: true
-      t.boolean :management, null: false, default: false
-      t.jsonb :metadata, null: false, default: {}
-      t.timestamps
+    add_index :devices, [:organization_id, :name] unless index_exists?(:devices, [:organization_id, :name])
+    add_index :devices, [:organization_id, :hostname] unless index_exists?(:devices, [:organization_id, :hostname])
+    add_index :devices, [:organization_id, :serial_number] unless index_exists?(:devices, [:organization_id, :serial_number])
+  end
+
+  def ensure_device_interfaces_table!
+    unless table_exists?(:device_interfaces)
+      create_table :device_interfaces do |t|
+        t.references :device, null: false, foreign_key: true
+        t.string :name, null: false
+        t.string :interface_type
+        t.string :description
+        t.boolean :enabled, null: false, default: true
+        t.boolean :management, null: false, default: false
+        t.jsonb :metadata, null: false, default: {}
+        t.timestamps
+      end
     end
-    add_index :device_interfaces, [:device_id, :name], unique: true
 
-    add_column :network_maps, :metadata, :jsonb, null: false, default: {}
+    add_index :device_interfaces, [:device_id, :name], unique: true unless index_exists?(:device_interfaces, [:device_id, :name], unique: true)
+  end
 
-    add_reference :map_nodes, :mappable, polymorphic: true, null: true
-    add_column :map_nodes, :width, :integer
-    add_column :map_nodes, :height, :integer
-    add_column :map_nodes, :label_override, :string
-    add_column :map_nodes, :visible, :boolean, null: false, default: true
-    add_column :map_nodes, :collapsed, :boolean, null: false, default: false
+  def ensure_network_maps_metadata!
+    add_column :network_maps, :metadata, :jsonb, null: false, default: {} unless column_exists?(:network_maps, :metadata)
+  end
 
-    create_table :map_edges do |t|
-      t.references :network_map, null: false, foreign_key: true
-      t.references :source_node, null: false, foreign_key: { to_table: :map_nodes }
-      t.references :target_node, null: false, foreign_key: { to_table: :map_nodes }
-      t.string :edge_type, null: false, default: "logical"
-      t.string :label
-      t.string :color
-      t.jsonb :metadata, null: false, default: {}
-      t.timestamps
+  def ensure_map_nodes_projection_columns!
+    add_column :map_nodes, :mappable_type, :string unless column_exists?(:map_nodes, :mappable_type)
+    add_column :map_nodes, :mappable_id, :bigint unless column_exists?(:map_nodes, :mappable_id)
+    add_index :map_nodes, [:mappable_type, :mappable_id] unless index_exists?(:map_nodes, [:mappable_type, :mappable_id])
+    add_column :map_nodes, :width, :integer unless column_exists?(:map_nodes, :width)
+    add_column :map_nodes, :height, :integer unless column_exists?(:map_nodes, :height)
+    add_column :map_nodes, :label_override, :string unless column_exists?(:map_nodes, :label_override)
+    add_column :map_nodes, :visible, :boolean, null: false, default: true unless column_exists?(:map_nodes, :visible)
+    add_column :map_nodes, :collapsed, :boolean, null: false, default: false unless column_exists?(:map_nodes, :collapsed)
+  end
+
+  def ensure_map_edges_table!
+    unless table_exists?(:map_edges)
+      create_table :map_edges do |t|
+        t.references :network_map, null: false, foreign_key: true
+        t.references :source_node, null: false, foreign_key: { to_table: :map_nodes }
+        t.references :target_node, null: false, foreign_key: { to_table: :map_nodes }
+        t.string :edge_type, null: false, default: "logical"
+        t.string :label
+        t.string :color
+        t.jsonb :metadata, null: false, default: {}
+        t.timestamps
+      end
     end
-    add_index :map_edges, [:network_map_id, :source_node_id, :target_node_id, :edge_type], unique: true, name: "idx_map_edges_uniqueness"
 
-    create_table :zabbix_links do |t|
-      t.references :organization, null: false, foreign_key: true
-      t.references :zabbix_connection, null: false, foreign_key: true
-      t.string :linkable_type, null: false
-      t.bigint :linkable_id, null: false
-      t.string :resource_type, null: false
-      t.string :external_id, null: false
-      t.string :external_key
-      t.string :name
-      t.jsonb :metadata, null: false, default: {}
-      t.timestamps
+    unless index_exists?(:map_edges, [:network_map_id, :source_node_id, :target_node_id, :edge_type], unique: true, name: "idx_map_edges_uniqueness")
+      add_index :map_edges, [:network_map_id, :source_node_id, :target_node_id, :edge_type], unique: true, name: "idx_map_edges_uniqueness"
     end
-    add_index :zabbix_links, [:linkable_type, :linkable_id]
-    add_index :zabbix_links, [:organization_id, :zabbix_connection_id, :resource_type, :external_id], unique: true, name: "idx_zabbix_links_external_uniqueness"
+  end
+
+  def ensure_zabbix_links_table!
+    unless table_exists?(:zabbix_links)
+      create_table :zabbix_links do |t|
+        t.references :organization, null: false, foreign_key: true
+        t.references :zabbix_connection, null: false, foreign_key: true
+        t.string :linkable_type, null: false
+        t.bigint :linkable_id, null: false
+        t.string :resource_type, null: false
+        t.string :external_id, null: false
+        t.string :external_key
+        t.string :name
+        t.jsonb :metadata, null: false, default: {}
+        t.timestamps
+      end
+    end
+
+    add_index :zabbix_links, [:linkable_type, :linkable_id] unless index_exists?(:zabbix_links, [:linkable_type, :linkable_id])
+    unless index_exists?(:zabbix_links, [:organization_id, :zabbix_connection_id, :resource_type, :external_id], unique: true, name: "idx_zabbix_links_external_uniqueness")
+      add_index :zabbix_links, [:organization_id, :zabbix_connection_id, :resource_type, :external_id], unique: true, name: "idx_zabbix_links_external_uniqueness"
+    end
+  end
+
+  def ensure_map_monitoring_bindings_table!
+    return if table_exists?(:map_monitoring_bindings)
 
     create_table :map_monitoring_bindings do |t|
       t.references :map_node, null: false, foreign_key: true
@@ -120,40 +186,18 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       t.jsonb :metadata, null: false, default: {}
       t.timestamps
     end
-
-    migrate_legacy_sites_and_devices!
-    backfill_map_node_mappables!
-    backfill_legacy_zabbix_links!
   end
-
-  def down
-    drop_table :map_monitoring_bindings
-    drop_table :zabbix_links
-    drop_table :map_edges
-
-    remove_column :map_nodes, :collapsed
-    remove_column :map_nodes, :visible
-    remove_column :map_nodes, :label_override
-    remove_column :map_nodes, :height
-    remove_column :map_nodes, :width
-    remove_reference :map_nodes, :mappable, polymorphic: true
-
-    remove_column :network_maps, :metadata
-
-    drop_table :device_interfaces
-    drop_table :devices
-    drop_table :sites
-  end
-
-  private
 
   def migrate_legacy_sites_and_devices!
+    return unless table_exists?(:map_pops) && table_exists?(:map_nodes) && table_exists?(:sites) && table_exists?(:devices)
+
     say_with_time "Migrating legacy POPs to sites and nodes to devices" do
       MigrationMapPop.find_each do |legacy_pop|
-        site = MigrationSite.create!(
-          organization_id: network_map_org_id(legacy_pop.network_map_id),
+        organization_id = network_map_org_id(legacy_pop.network_map_id)
+        site = find_site_by_legacy_pop(legacy_pop) || MigrationSite.create!(
+          organization_id:,
           name: legacy_pop.name,
-          slug: unique_site_slug(network_map_org_id(legacy_pop.network_map_id), legacy_pop.name),
+          slug: unique_site_slug(organization_id, legacy_pop.name),
           lat: legacy_pop.lat,
           lng: legacy_pop.lng,
           metadata: {
@@ -165,92 +209,125 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         )
 
         MigrationMapNode.where(map_pop_id: legacy_pop.id).find_each do |legacy_node|
+          next if find_device_by_legacy_node(legacy_node).present?
+
           MigrationDevice.create!(
             organization_id: site.organization_id,
             site_id: site.id,
             name: legacy_node.label,
             role: normalize_role(legacy_node.node_kind),
             status: "active",
-            metadata: {
-              legacy_map_node_id: legacy_node.id,
-              legacy_external_id: legacy_node.external_id,
-              legacy_node_kind: legacy_node.node_kind,
-              icon: legacy_node.icon,
-              color: legacy_node.color,
-              position: { x: legacy_node.x, y: legacy_node.y, lat: legacy_node.lat, lng: legacy_node.lng }
-            }.merge(legacy_node.metadata || {})
+            metadata: build_device_metadata(legacy_node)
           )
         end
       end
 
       MigrationMapNode.where(map_pop_id: nil).find_each do |legacy_node|
-        org_id = network_map_org_id(legacy_node.network_map_id)
+        next if find_device_by_legacy_node(legacy_node).present?
+
         MigrationDevice.create!(
-          organization_id: org_id,
+          organization_id: network_map_org_id(legacy_node.network_map_id),
           name: legacy_node.label,
           role: normalize_role(legacy_node.node_kind),
           status: "active",
-          metadata: {
-            legacy_map_node_id: legacy_node.id,
-            legacy_external_id: legacy_node.external_id,
-            legacy_node_kind: legacy_node.node_kind,
-            icon: legacy_node.icon,
-            color: legacy_node.color,
-            position: { x: legacy_node.x, y: legacy_node.y, lat: legacy_node.lat, lng: legacy_node.lng }
-          }.merge(legacy_node.metadata || {})
+          metadata: build_device_metadata(legacy_node)
         )
       end
     end
   end
 
   def backfill_map_node_mappables!
+    return unless table_exists?(:map_nodes) && table_exists?(:devices)
+    return unless column_exists?(:map_nodes, :mappable_type) && column_exists?(:map_nodes, :mappable_id)
+
     say_with_time "Backfilling map node mappables" do
       MigrationMapNode.find_each do |legacy_node|
-        device = MigrationDevice.find_by("metadata ->> 'legacy_map_node_id' = ?", legacy_node.id.to_s)
+        next if legacy_node.mappable_type.present? && legacy_node.mappable_id.present?
+
+        device = find_device_by_legacy_node(legacy_node)
         next if device.blank?
 
         legacy_node.update_columns(
           mappable_type: "Device",
           mappable_id: device.id,
-          label_override: legacy_node.label,
-          width: legacy_node.size,
-          height: legacy_node.size,
-          visible: true,
-          collapsed: false
+          label_override: legacy_node.try(:label_override).presence || legacy_node.label,
+          width: legacy_node.try(:width).presence || legacy_node.size,
+          height: legacy_node.try(:height).presence || legacy_node.size,
+          visible: legacy_node.try(:visible).nil? ? true : legacy_node.visible,
+          collapsed: legacy_node.try(:collapsed).nil? ? false : legacy_node.collapsed
         )
       end
     end
   end
 
   def backfill_legacy_zabbix_links!
+    return unless table_exists?(:map_nodes) && table_exists?(:devices) && table_exists?(:zabbix_links)
+
     say_with_time "Backfilling legacy Zabbix links" do
       MigrationMapNode.where.not(zabbix_host_id: nil).find_each do |legacy_node|
-        device = MigrationDevice.find_by("metadata ->> 'legacy_map_node_id' = ?", legacy_node.id.to_s)
+        device = find_device_by_legacy_node(legacy_node)
         next if device.blank?
 
-        map = MigrationNetworkMap.find(legacy_node.network_map_id)
-        next if map.zabbix_connection_id.blank?
+        map = MigrationNetworkMap.find_by(id: legacy_node.network_map_id)
+        next if map.blank? || map.zabbix_connection_id.blank?
+        next if MigrationSite.connection.select_value(existing_zabbix_link_sql(map, device, legacy_node)).present?
 
-        MigrationSite.connection.execute <<~SQL
-          INSERT INTO zabbix_links
-            (organization_id, zabbix_connection_id, linkable_type, linkable_id, resource_type, external_id, name, metadata, created_at, updated_at)
-          VALUES
-            (
-              #{map.organization_id},
-              #{map.zabbix_connection_id},
-              'Device',
-              #{device.id},
-              'host',
-              '#{legacy_node.zabbix_host_id}',
-              #{MigrationSite.connection.quote(legacy_node.label)},
-              '#{{ legacy_map_node_id: legacy_node.id }.to_json}'::jsonb,
-              CURRENT_TIMESTAMP,
-              CURRENT_TIMESTAMP
-            )
-          ON CONFLICT DO NOTHING
-        SQL
+        MigrationSite.connection.execute(insert_zabbix_link_sql(map, device, legacy_node))
       end
     end
+  end
+
+  def find_site_by_legacy_pop(legacy_pop)
+    MigrationSite.find_by("metadata ->> 'legacy_map_pop_id' = ?", legacy_pop.id.to_s)
+  end
+
+  def find_device_by_legacy_node(legacy_node)
+    MigrationDevice.find_by("metadata ->> 'legacy_map_node_id' = ?", legacy_node.id.to_s)
+  end
+
+  def build_device_metadata(legacy_node)
+    {
+      legacy_map_node_id: legacy_node.id,
+      legacy_external_id: legacy_node.external_id,
+      legacy_node_kind: legacy_node.node_kind,
+      icon: legacy_node.icon,
+      color: legacy_node.color,
+      position: { x: legacy_node.x, y: legacy_node.y, lat: legacy_node.lat, lng: legacy_node.lng }
+    }.merge(legacy_node.metadata || {})
+  end
+
+  def existing_zabbix_link_sql(map, device, legacy_node)
+    <<~SQL.squish
+      SELECT id FROM zabbix_links
+      WHERE organization_id = #{map.organization_id}
+        AND zabbix_connection_id = #{map.zabbix_connection_id}
+        AND resource_type = 'host'
+        AND external_id = #{MigrationSite.connection.quote(legacy_node.zabbix_host_id.to_s)}
+        AND linkable_type = 'Device'
+        AND linkable_id = #{device.id}
+      LIMIT 1
+    SQL
+  end
+
+  def insert_zabbix_link_sql(map, device, legacy_node)
+    <<~SQL
+      INSERT INTO zabbix_links
+        (organization_id, zabbix_connection_id, linkable_type, linkable_id, resource_type, external_id, name, metadata, created_at, updated_at)
+      VALUES
+        (
+          #{map.organization_id},
+          #{map.zabbix_connection_id},
+          'Device',
+          #{device.id},
+          'host',
+          #{MigrationSite.connection.quote(legacy_node.zabbix_host_id.to_s)},
+          #{MigrationSite.connection.quote(legacy_node.label)},
+          #{MigrationSite.connection.quote({ legacy_map_node_id: legacy_node.id }.to_json)}::jsonb,
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        )
+      ON CONFLICT DO NOTHING
+    SQL
   end
 
   def network_map_org_id(network_map_id)
@@ -271,8 +348,6 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
   end
 
   def normalize_role(node_kind)
-    return "generic" if node_kind.blank?
-
-    node_kind.to_s
+    node_kind.present? ? node_kind.to_s : "generic"
   end
 end
