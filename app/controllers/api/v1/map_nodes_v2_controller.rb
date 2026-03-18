@@ -54,11 +54,19 @@ class Api::V1::MapNodesV2Controller < Api::V1::BaseController
   private
 
   def set_network_map
-    @network_map = find_record(current_organization.network_maps, params[:map_id] || params[:network_map_id])
+    @network_map = find_record(current_organization.network_maps, network_map_lookup_id)
   end
 
   def set_map_node
     @map_node = find_record(@network_map.map_nodes, params[:id])
+  end
+
+  def network_map_lookup_id
+    return params[:network_map_id] if params[:network_map_id].present?
+    return params[:map_id] if params[:map_id].present?
+    return params[:id] if action_name.in?(%w[from_site from_device])
+
+    nil
   end
 
   def find_mappable(type, id)
@@ -72,6 +80,6 @@ class Api::V1::MapNodesV2Controller < Api::V1::BaseController
   end
 
   def map_node_params
-    params.fetch(:map_node, ActionController::Parameters.new).permit(:mappable_type, :mappable_id, :x, :y, :width, :height, :label_override, :color, :icon, :visible, :collapsed, :lat, :lng, metadata: {}).to_h.symbolize_keys
+    params.fetch(:map_node, params.fetch(:map_nodes_v2, ActionController::Parameters.new)).permit(:mappable_type, :mappable_id, :x, :y, :width, :height, :label_override, :color, :icon, :visible, :collapsed, :lat, :lng, metadata: {}).to_h.symbolize_keys
   end
 end
