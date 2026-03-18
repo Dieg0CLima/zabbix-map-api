@@ -71,6 +71,18 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         t.jsonb :metadata, null: false, default: {}
         t.timestamps
       end
+    else
+      add_reference :sites, :organization, foreign_key: true unless column_exists?(:sites, :organization_id)
+      add_column :sites, :name, :string unless column_exists?(:sites, :name)
+      add_column :sites, :slug, :string unless column_exists?(:sites, :slug)
+      add_column :sites, :description, :text unless column_exists?(:sites, :description)
+      add_column :sites, :address, :string unless column_exists?(:sites, :address)
+      add_column :sites, :city, :string unless column_exists?(:sites, :city)
+      add_column :sites, :state, :string unless column_exists?(:sites, :state)
+      add_column :sites, :lat, :decimal, precision: 10, scale: 6 unless column_exists?(:sites, :lat)
+      add_column :sites, :lng, :decimal, precision: 10, scale: 6 unless column_exists?(:sites, :lng)
+      add_column :sites, :metadata, :jsonb, null: false, default: {} unless column_exists?(:sites, :metadata)
+      add_timestamps :sites, null: true unless column_exists?(:sites, :created_at) || column_exists?(:sites, :updated_at)
     end
 
     add_index :sites, [:organization_id, :slug], unique: true unless index_exists?(:sites, [:organization_id, :slug], unique: true)
@@ -93,6 +105,19 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         t.jsonb :metadata, null: false, default: {}
         t.timestamps
       end
+    else
+      add_reference :devices, :organization, foreign_key: true unless column_exists?(:devices, :organization_id)
+      add_reference :devices, :site, foreign_key: true unless column_exists?(:devices, :site_id)
+      add_column :devices, :name, :string unless column_exists?(:devices, :name)
+      add_column :devices, :hostname, :string unless column_exists?(:devices, :hostname)
+      add_column :devices, :role, :string, null: false, default: "generic" unless column_exists?(:devices, :role)
+      add_column :devices, :vendor, :string unless column_exists?(:devices, :vendor)
+      add_column :devices, :model, :string unless column_exists?(:devices, :model)
+      add_column :devices, :serial_number, :string unless column_exists?(:devices, :serial_number)
+      add_column :devices, :management_ip, :string unless column_exists?(:devices, :management_ip)
+      add_column :devices, :status, :string, null: false, default: "active" unless column_exists?(:devices, :status)
+      add_column :devices, :metadata, :jsonb, null: false, default: {} unless column_exists?(:devices, :metadata)
+      add_timestamps :devices, null: true unless column_exists?(:devices, :created_at) || column_exists?(:devices, :updated_at)
     end
 
     add_index :devices, [:organization_id, :name] unless index_exists?(:devices, [:organization_id, :name])
@@ -112,6 +137,15 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         t.jsonb :metadata, null: false, default: {}
         t.timestamps
       end
+    else
+      add_reference :device_interfaces, :device, foreign_key: true unless column_exists?(:device_interfaces, :device_id)
+      add_column :device_interfaces, :name, :string unless column_exists?(:device_interfaces, :name)
+      add_column :device_interfaces, :interface_type, :string unless column_exists?(:device_interfaces, :interface_type)
+      add_column :device_interfaces, :description, :string unless column_exists?(:device_interfaces, :description)
+      add_column :device_interfaces, :enabled, :boolean, null: false, default: true unless column_exists?(:device_interfaces, :enabled)
+      add_column :device_interfaces, :management, :boolean, null: false, default: false unless column_exists?(:device_interfaces, :management)
+      add_column :device_interfaces, :metadata, :jsonb, null: false, default: {} unless column_exists?(:device_interfaces, :metadata)
+      add_timestamps :device_interfaces, null: true unless column_exists?(:device_interfaces, :created_at) || column_exists?(:device_interfaces, :updated_at)
     end
 
     add_index :device_interfaces, [:device_id, :name], unique: true unless index_exists?(:device_interfaces, [:device_id, :name], unique: true)
