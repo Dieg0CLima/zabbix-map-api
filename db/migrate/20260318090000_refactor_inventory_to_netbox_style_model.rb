@@ -228,12 +228,10 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
     say_with_time "Migrating legacy POPs to sites and nodes to devices" do
       MigrationMapPop.find_each do |legacy_pop|
         organization_id = network_map_org_id(legacy_pop.network_map_id)
-        site = find_site_by_legacy_pop(legacy_pop) || MigrationSite.create!(
-          site_create_attributes(legacy_pop, organization_id)
-        )
+        site = find_or_create_site_for_legacy_pop(legacy_pop, organization_id)
 
         MigrationMapNode.where(map_pop_id: legacy_pop.id).find_each do |legacy_node|
-          next if find_device_by_legacy_node(legacy_node).present?
+          next if find_or_match_device_for_legacy_node(legacy_node, site.organization_id, site.id).present?
 
           MigrationDevice.create!(
             device_create_attributes(legacy_node, site.organization_id, site.id)
@@ -242,10 +240,11 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       end
 
       MigrationMapNode.where(map_pop_id: nil).find_each do |legacy_node|
-        next if find_device_by_legacy_node(legacy_node).present?
+        organization_id = network_map_org_id(legacy_node.network_map_id)
+        next if find_or_match_device_for_legacy_node(legacy_node, organization_id, nil).present?
 
         MigrationDevice.create!(
-          device_create_attributes(legacy_node, network_map_org_id(legacy_node.network_map_id), nil)
+          device_create_attributes(legacy_node, organization_id, nil)
         )
       end
     end
@@ -293,6 +292,18 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
   end
 
 
+
+  def find_or_create_site_for_legacy_pop(legacy_pop, organization_id)
+    site = find_site_by_legacy_pop(legacy_pop, organization_id)
+    return site if site.present?
+
+    MigrationSite.create!(site_create_attributes(legacy_pop, organization_id))
+  end
+
+  def find_or_match_device_for_legacy_node(legacy_node, organization_id, site_id)
+    find_device_by_legacy_node(legacy_node, organization_id, site_id)
+  end
+
   def site_create_attributes(legacy_pop, organization_id)
     attrs = {
       organization_id:,
@@ -336,12 +347,59 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
     attrs
   end
 
-  def find_site_by_legacy_pop(legacy_pop)
-    MigrationSite.find_by("metadata ->> 'legacy_map_pop_id' = ?", legacy_pop.id.to_s)
+  def find_site_by_legacy_pop(legacy_pop, organization_id)
+    site = MigrationSite.find_by("metadata ->> 'legacy_map_pop_id' = ?", legacy_pop.id.to_s)
+    return site if site.present?
+
+    scope = MigrationSite.where(organization_id:, name: legacy_pop.name)
+    scope = scope.where(external_id: legacy_pop.external_id) if column_exists?(:sites, :external_id) && legacy_pop.external_id.present?
+    site = scope.first || MigrationSite.where(organization_id:, name: legacy_pop.name).first
+    return site if site.blank?
+
+    backfill_site_metadata!(site, legacy_pop)
+    site
   end
 
-  def find_device_by_legacy_node(legacy_node)
-    MigrationDevice.find_by("metadata ->> 'legacy_map_node_id' = ?", legacy_node.id.to_s)
+  def find_device_by_legacy_node(legacy_node, organization_id = nil, site_id = nil)
+    device = MigrationDevice.find_by("metadata ->> 'legacy_map_node_id' = ?", legacy_node.id.to_s)
+    return device if device.present?
+
+    return if organization_id.blank?
+
+    scope = MigrationDevice.where(organization_id:, name: legacy_node.label)
+    scope = scope.where(site_id:) if site_id.present? && column_exists?(:devices, :site_id)
+    scope = scope.where(external_id: legacy_node.external_id) if column_exists?(:devices, :external_id) && legacy_node.external_id.present?
+    device = scope.first || MigrationDevice.where(organization_id:, name: legacy_node.label).first
+    return device if device.blank?
+
+    backfill_device_metadata!(device, legacy_node)
+    device
+  end
+
+
+  def backfill_site_metadata!(site, legacy_pop)
+    metadata = (site.metadata || {}).dup
+    metadata["legacy_map_pop_id"] ||= legacy_pop.id
+    metadata["legacy_external_id"] ||= legacy_pop.external_id
+    metadata["legacy_network_map_id"] ||= legacy_pop.network_map_id
+    metadata["color"] ||= legacy_pop.color
+    site.update_columns(metadata:) if site.has_attribute?(:metadata)
+  end
+
+  def backfill_device_metadata!(device, legacy_node)
+    metadata = (device.metadata || {}).dup
+    metadata["legacy_map_node_id"] ||= legacy_node.id
+    metadata["legacy_external_id"] ||= legacy_node.external_id
+    metadata["legacy_node_kind"] ||= legacy_node.node_kind
+    metadata["icon"] ||= legacy_node.icon
+    metadata["color"] ||= legacy_node.color
+    metadata["position"] ||= {
+      x: legacy_node.x,
+      y: legacy_node.y,
+      lat: legacy_node.lat,
+      lng: legacy_node.lng
+    }
+    device.update_columns(metadata:) if device.has_attribute?(:metadata)
   end
 
   def build_device_metadata(legacy_node)
