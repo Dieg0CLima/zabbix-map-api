@@ -229,29 +229,14 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       MigrationMapPop.find_each do |legacy_pop|
         organization_id = network_map_org_id(legacy_pop.network_map_id)
         site = find_site_by_legacy_pop(legacy_pop) || MigrationSite.create!(
-          organization_id:,
-          name: legacy_pop.name,
-          slug: unique_site_slug(organization_id, legacy_pop.name),
-          lat: legacy_pop.lat,
-          lng: legacy_pop.lng,
-          metadata: {
-            legacy_map_pop_id: legacy_pop.id,
-            legacy_external_id: legacy_pop.external_id,
-            legacy_network_map_id: legacy_pop.network_map_id,
-            color: legacy_pop.color
-          }.merge(legacy_pop.metadata || {})
+          site_create_attributes(legacy_pop, organization_id)
         )
 
         MigrationMapNode.where(map_pop_id: legacy_pop.id).find_each do |legacy_node|
           next if find_device_by_legacy_node(legacy_node).present?
 
           MigrationDevice.create!(
-            organization_id: site.organization_id,
-            site_id: site.id,
-            name: legacy_node.label,
-            role: normalize_role(legacy_node.node_kind),
-            status: "active",
-            metadata: build_device_metadata(legacy_node)
+            device_create_attributes(legacy_node, site.organization_id, site.id)
           )
         end
       end
@@ -260,11 +245,7 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         next if find_device_by_legacy_node(legacy_node).present?
 
         MigrationDevice.create!(
-          organization_id: network_map_org_id(legacy_node.network_map_id),
-          name: legacy_node.label,
-          role: normalize_role(legacy_node.node_kind),
-          status: "active",
-          metadata: build_device_metadata(legacy_node)
+          device_create_attributes(legacy_node, network_map_org_id(legacy_node.network_map_id), nil)
         )
       end
     end
@@ -309,6 +290,50 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
         MigrationSite.connection.execute(insert_zabbix_link_sql(map, device, legacy_node))
       end
     end
+  end
+
+
+  def site_create_attributes(legacy_pop, organization_id)
+    attrs = {
+      organization_id:,
+      name: legacy_pop.name,
+      slug: unique_site_slug(organization_id, legacy_pop.name),
+      lat: legacy_pop.lat,
+      lng: legacy_pop.lng,
+      metadata: {
+        legacy_map_pop_id: legacy_pop.id,
+        legacy_external_id: legacy_pop.external_id,
+        legacy_network_map_id: legacy_pop.network_map_id,
+        color: legacy_pop.color
+      }.merge(legacy_pop.metadata || {})
+    }
+
+    attrs[:external_id] = legacy_pop.external_id.presence || "site-#{legacy_pop.id}" if column_exists?(:sites, :external_id)
+    attrs[:status] = "active" if column_exists?(:sites, :status)
+    attrs[:site_type] = "pop" if column_exists?(:sites, :site_type)
+    attrs[:description] = legacy_pop.metadata["description"] if column_exists?(:sites, :description) && legacy_pop.metadata.is_a?(Hash)
+    attrs[:address] = legacy_pop.metadata["address"] if column_exists?(:sites, :address) && legacy_pop.metadata.is_a?(Hash)
+    attrs[:city] = legacy_pop.metadata["city"] if column_exists?(:sites, :city) && legacy_pop.metadata.is_a?(Hash)
+    attrs[:state] = legacy_pop.metadata["state"] if column_exists?(:sites, :state) && legacy_pop.metadata.is_a?(Hash)
+
+    attrs
+  end
+
+  def device_create_attributes(legacy_node, organization_id, site_id)
+    attrs = {
+      organization_id:,
+      name: legacy_node.label,
+      role: normalize_role(legacy_node.node_kind),
+      status: "active",
+      metadata: build_device_metadata(legacy_node)
+    }
+
+    attrs[:site_id] = site_id if site_id.present? && column_exists?(:devices, :site_id)
+    attrs[:hostname] = legacy_node.zabbix_ref if column_exists?(:devices, :hostname) && legacy_node.zabbix_ref.present?
+    attrs[:external_id] = legacy_node.external_id.presence || "device-#{legacy_node.id}" if column_exists?(:devices, :external_id)
+    attrs[:device_type] = normalize_role(legacy_node.node_kind) if column_exists?(:devices, :device_type)
+
+    attrs
   end
 
   def find_site_by_legacy_pop(legacy_pop)
