@@ -16,6 +16,10 @@ class CreateDevices < ActiveRecord::Migration[8.0]
 
     add_index :devices, %i[organization_id external_id], unique: true, if_not_exists: true
     add_index :devices, %i[organization_id name], if_not_exists: true
+
+    unless column_exists?(:devices, :zabbix_host_id)
+      add_column :devices, :zabbix_host_id, :bigint
+    end
     add_index :devices, :zabbix_host_id, if_not_exists: true
 
     unless foreign_key_exists?(:devices, to_table: :zabbix_hosts)
