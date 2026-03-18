@@ -97,7 +97,10 @@ class MapNode < ApplicationRecord
 
   def mappable_uniqueness_within_map
     return if mappable.blank? || network_map_id.blank?
-    return unless self.class.where(network_map_id:, mappable_type:, mappable_id:).where.not(id: id).exists?
+
+    scope = self.class.where(network_map_id:, mappable_type:, mappable_id:)
+    scope = scope.where.not(id:) if id.present?
+    return unless scope.exists?
 
     errors.add(:mappable_id, "is already present in this map")
   end
