@@ -4,7 +4,14 @@ class Api::V1::SitesController < Api::V1::BaseController
 
   def index
     sites = current_organization.sites.order(:id)
+    sites = sites.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
     render_data(data: sites.map { |site| Api::V1::SiteSerializer.new(site).as_json })
+  end
+
+  def dropdown
+    sites = current_organization.sites.order(:name)
+    sites = sites.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
+    render_data(data: sites.limit(50).map { |site| { value: site.id, label: site.name, code: site.slug, meta: { slug: site.slug } } })
   end
 
   def show
@@ -12,14 +19,14 @@ class Api::V1::SitesController < Api::V1::BaseController
   end
 
   def create
-    site = Inventory::Sites::CreateService.new(organization: current_organization, params: site_params).call
-    render_data(data: Api::V1::SiteSerializer.new(site).as_json, status: :created)
+    site, marker = Sites::CreateSite.new(organization: current_organization, params: site_params.to_h.symbolize_keys, map_context: map_context_params.to_h.symbolize_keys, actor: current_user).call
+    render_data(data: { site: Api::V1::SiteSerializer.new(site).as_json, marker: marker && Api::V1::MapElementSerializer.new(marker).as_json }, status: :created)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
 
   def update
-    site = Inventory::Sites::UpdateService.new(site: @site, params: site_params).call
+    site = Sites::UpdateSite.new(site: @site, params: site_params.to_h.symbolize_keys, actor: current_user).call
     render_data(data: Api::V1::SiteSerializer.new(site).as_json)
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
@@ -40,5 +47,9 @@ class Api::V1::SitesController < Api::V1::BaseController
 
   def site_params
     params.require(:site).permit(:name, :slug, :description, :address, :city, :state, :lat, :lng, metadata: {})
+  end
+
+  def map_context_params
+    params.fetch(:map_context, ActionController::Parameters.new).permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
   end
 end

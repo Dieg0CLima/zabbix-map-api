@@ -16,8 +16,18 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :sites
+      resources :sites do
+        collection do
+          get :dropdown
+        end
+      end
       resources :devices do
+        collection do
+          get :dropdown
+        end
+        member do
+          patch :site_link
+        end
         resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]
         resources :zabbix_links, controller: "zabbix_links", only: %i[index create]
       end
@@ -27,6 +37,9 @@ Rails.application.routes.draw do
 
       resources :network_maps, controller: "network_maps_v2", only: %i[index create show update destroy] do
         member do
+          get :editor_state
+          get :available_sites
+          get :available_devices
           get :health
           get :metrics
           get :events
@@ -42,6 +55,20 @@ Rails.application.routes.draw do
         end
 
         resources :edges, controller: "map_edges", param: :id, only: %i[index create update destroy]
+        resources :site_markers, controller: "site_markers", only: %i[create update destroy] do
+          collection do
+            post :bulk_create
+            patch :bulk_update
+            delete :bulk_destroy
+          end
+        end
+        resources :device_markers, controller: "device_markers", only: %i[create update destroy] do
+          collection do
+            post :bulk_create
+            patch :bulk_update
+            delete :bulk_destroy
+          end
+        end
       end
 
       resources :legacy_network_maps, controller: "network_maps", path: "legacy/network_maps" do

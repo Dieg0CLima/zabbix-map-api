@@ -41,6 +41,7 @@ class MapNode < ApplicationRecord
   validates :icon, :color, presence: true
 
   validate :mappable_presence_for_inventory_projection
+  validate :mappable_uniqueness_within_map
   validate :pop_must_belong_to_same_map
   validate :map_pop_external_id_must_exist
   validate :zabbix_host_id_format
@@ -92,6 +93,13 @@ class MapNode < ApplicationRecord
     return if map_pop.present? || label.present?
 
     errors.add(:mappable, "must reference a documented resource")
+  end
+
+  def mappable_uniqueness_within_map
+    return if mappable.blank? || network_map_id.blank?
+    return unless self.class.where(network_map_id:, mappable_type:, mappable_id:).where.not(id: id).exists?
+
+    errors.add(:mappable_id, "is already present in this map")
   end
 
   def pop_must_belong_to_same_map
