@@ -1,4 +1,4 @@
-class MigratePopAndNodesToDomainEntities < ActiveRecord::Migration[8.0]
+class MigratePopsAndNodesToDomainEntities < ActiveRecord::Migration[8.0]
   # Data migration: creates canonical Site/Device records for each MapPop/MapNode,
   # then creates MapElements to represent their presence in each map.
   #
