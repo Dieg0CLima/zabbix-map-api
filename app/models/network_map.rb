@@ -4,6 +4,8 @@ class NetworkMap < ApplicationRecord
 
   has_many :map_pops, dependent: :destroy
   has_many :map_nodes, dependent: :destroy
+  has_many :map_edges, dependent: :destroy
+  has_many :map_monitoring_bindings, through: :map_nodes
   has_many :network_cables, dependent: :destroy
   has_many :network_map_snapshots, dependent: :destroy
 

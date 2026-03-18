@@ -16,7 +16,35 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :network_maps do
+      resources :sites
+      resources :devices do
+        resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]
+        resources :zabbix_links, controller: "zabbix_links", only: %i[index create]
+      end
+      get "device_interfaces/:interface_id/zabbix_links", to: "zabbix_links#index"
+      post "device_interfaces/:interface_id/zabbix_links", to: "zabbix_links#create"
+      resources :zabbix_links, only: :destroy
+
+      resources :network_maps, controller: "network_maps_v2", only: %i[index create show update destroy] do
+        member do
+          get :health
+          get :metrics
+          get :events
+        end
+
+        resources :nodes, controller: "map_nodes_v2", only: %i[index create update destroy] do
+          resources :monitoring_bindings, controller: "map_monitoring_bindings", only: %i[index create update destroy]
+        end
+
+        member do
+          post "nodes/from-site", to: "map_nodes_v2#from_site"
+          post "nodes/from-device", to: "map_nodes_v2#from_device"
+        end
+
+        resources :edges, controller: "map_edges", param: :id, only: %i[index create update destroy]
+      end
+
+      resources :legacy_network_maps, controller: "network_maps", path: "legacy/network_maps" do
         resources :map_pops
         resources :map_nodes do
           resources :map_node_items, only: %i[index create destroy]
@@ -39,6 +67,10 @@ Rails.application.routes.draw do
           collection do
             get :dropdown
           end
+        end
+        member do
+          get "hosts/dropdown", to: "zabbix_connection_dropdowns#hosts"
+          get "items/dropdown", to: "zabbix_connection_dropdowns#items"
         end
       end
     end

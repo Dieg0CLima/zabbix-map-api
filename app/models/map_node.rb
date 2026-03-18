@@ -1,11 +1,23 @@
 class MapNode < ApplicationRecord
-  NODE_KINDS = %w[switch router server firewall gateway endpoint text zabbix_host olt cto splitter].freeze
+  NODE_KINDS = %w[switch router server firewall gateway endpoint text zabbix_host olt cto splitter generic].freeze
 
   belongs_to :network_map
   belongs_to :map_pop, optional: true
+  belongs_to :mappable, polymorphic: true, optional: true
   belongs_to :zabbix_host, class_name: "Zabbix::Host", optional: true
 
   has_many :map_node_items, dependent: :destroy
+  has_many :monitoring_bindings, class_name: "MapMonitoringBinding", dependent: :destroy
+  has_many :outgoing_edges,
+           class_name: "MapEdge",
+           foreign_key: :source_node_id,
+           inverse_of: :source_node,
+           dependent: :destroy
+  has_many :incoming_edges,
+           class_name: "MapEdge",
+           foreign_key: :target_node_id,
+           inverse_of: :target_node,
+           dependent: :destroy
 
   before_validation :resolve_map_pop_external_id
   before_validation :apply_default_visuals
@@ -28,6 +40,7 @@ class MapNode < ApplicationRecord
   validates :size, numericality: { only_integer: true, greater_than_or_equal_to: 18, less_than_or_equal_to: 56 }
   validates :icon, :color, presence: true
 
+  validate :mappable_presence_for_inventory_projection
   validate :pop_must_belong_to_same_map
   validate :map_pop_external_id_must_exist
   validate :zabbix_host_id_format
@@ -51,6 +64,11 @@ class MapNode < ApplicationRecord
     self.icon ||= "pi-server"
     self.color ||= "#2563eb"
     self.size ||= 30
+    self.visible = true if visible.nil?
+    self.collapsed = false if collapsed.nil?
+    self.width ||= size
+    self.height ||= size
+    self.label ||= label_override || mappable_label
     self.lat ||= x
     self.lng ||= y
     self.x ||= lat
@@ -67,6 +85,13 @@ class MapNode < ApplicationRecord
     return if @map_pop_external_id.blank? || map_pop.present?
 
     errors.add(:map_pop_id, "must reference an existing pop external_id")
+  end
+
+  def mappable_presence_for_inventory_projection
+    return if mappable.present?
+    return if map_pop.present? || label.present?
+
+    errors.add(:mappable, "must reference a documented resource")
   end
 
   def pop_must_belong_to_same_map
@@ -89,5 +114,11 @@ class MapNode < ApplicationRecord
     return if zabbix_host.zabbix_connection_id == network_map.zabbix_connection_id
 
     errors.add(:zabbix_host_id, "must belong to the network map Zabbix connection")
+  end
+
+  def mappable_label
+    return unless mappable.respond_to?(:name)
+
+    mappable.name
   end
 end
