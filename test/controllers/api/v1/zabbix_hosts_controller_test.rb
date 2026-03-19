@@ -9,8 +9,13 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
     @connection = @organization.zabbix_connections.create!(
       name: "Conn",
       status: "active",
-      connection_mode: "api",
-      base_url: "https://zabbix.local"
+      connection_mode: "database",
+      db_adapter: "postgresql",
+      db_host: "127.0.0.1",
+      db_port: 5432,
+      db_name: "zabbix",
+      db_username: "zabbix",
+      db_password: "secret"
     )
 
     post "/api/v1/users/sign_in", params: {
@@ -25,18 +30,32 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "dropdown returns mapped hosts with meta" do
-    @connection.zabbix_hosts.create!(
-      hostid: "10105",
-      name: "OLT-POP-CENTRO",
-      available: "1",
-      status: "0",
-      interfaces: [{ ip: "10.10.10.1", type: "2", main: "1" }],
-      metadata: { groups: [{ groupid: "8", name: "OLT" }], templates: [{ templateid: "19", name: "Template SNMP" }] }
-    )
+    fake_result = [
+      {
+        value: "10105",
+        label: "OLT-POP-CENTRO",
+        hostid: "10105",
+        name: "OLT-POP-CENTRO",
+        status: "enabled",
+        available: true,
+        metadata: {
+          interfaces: [{ ip: "10.10.10.1", dns: "", type: "snmp", main: true }],
+          groups: [{ groupid: "8", name: "OLT" }],
+          templates: [{ templateid: "19", name: "Template SNMP" }]
+        }
+      }
+    ]
 
-    get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
-      organization_id: @organization.id
-    }, headers: auth_headers, as: :json
+    fetcher = Minitest::Mock.new
+    fetcher.expect(:call, fake_result)
+
+    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher) do
+      get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
+        organization_id: @organization.id
+      }, headers: auth_headers, as: :json
+    end
+
+    fetcher.verify
 
     assert_response :ok
 
@@ -51,13 +70,29 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "dropdown filters hosts by query" do
-    @connection.zabbix_hosts.create!(hostid: "10634", name: "SWCX-001-001-005-CENTRAL", available: "1")
-    @connection.zabbix_hosts.create!(hostid: "10106", name: "MikroTik RB260GS by SNMP", available: "1")
+    fake_result = [
+      {
+        value: "10634",
+        label: "SWCX-001-001-005-CENTRAL",
+        hostid: "10634",
+        name: "SWCX-001-001-005-CENTRAL",
+        status: "enabled",
+        available: true,
+        metadata: { interfaces: [], groups: [], templates: [] }
+      }
+    ]
 
-    get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
-      organization_id: @organization.id,
-      q: "SWCX"
-    }, headers: auth_headers, as: :json
+    fetcher = Minitest::Mock.new
+    fetcher.expect(:call, fake_result)
+
+    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher) do
+      get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
+        organization_id: @organization.id,
+        q: "SWCX"
+      }, headers: auth_headers, as: :json
+    end
+
+    fetcher.verify
 
     assert_response :ok
 
@@ -66,24 +101,39 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "SWCX-001-001-005-CENTRAL", body.dig("data", 0, "label")
   end
 
-  test "show returns host details with suggested device attributes" do
-    @connection.zabbix_hosts.create!(
+  test "show returns host details fetched from zabbix database" do
+    payload = {
       hostid: "10572",
       name: "HOST-CORE-BRASILIA",
-      status: "0",
-      available: "1",
-      interfaces: [{ ip: "10.0.0.1", dns: "", type: "2", main: "1" }],
+      host: "core-bsb-01",
+      status: "enabled",
+      available: true,
+      interfaces: [{ ip: "10.0.0.1", dns: "", type: "snmp", main: true }],
+      inventory: { vendor: "Huawei", model: "S5720" },
       metadata: {
         host: "core-bsb-01",
-        inventory: { vendor: "Huawei", model: "S5720" },
         groups: [{ groupid: "4", name: "Core" }],
         templates: [{ templateid: "22", name: "Base Template" }]
+      },
+      suggested_device_attributes: {
+        name: "HOST-CORE-BRASILIA",
+        hostname: "core-bsb-01",
+        management_ip: "10.0.0.1",
+        vendor: "Huawei",
+        model: "S5720"
       }
-    )
+    }
 
-    get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/10572", params: {
-      organization_id: @organization.id
-    }, headers: auth_headers, as: :json
+    fetcher = Minitest::Mock.new
+    fetcher.expect(:call, payload)
+
+    Zabbix::HostDetailsFetcher.stub(:new, fetcher) do
+      get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/10572", params: {
+        organization_id: @organization.id
+      }, headers: auth_headers, as: :json
+    end
+
+    fetcher.verify
 
     assert_response :ok
 

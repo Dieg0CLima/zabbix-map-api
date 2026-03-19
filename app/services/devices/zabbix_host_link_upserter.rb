@@ -28,20 +28,16 @@ class Devices::ZabbixHostLinkUpserter
       raise ActiveRecord::RecordInvalid, @device
     end
 
-    host = connection.zabbix_hosts.find_by(hostid: host_id)
-    unless host
-      @device.errors.add(:zabbix_host_id, "not found for this Zabbix connection")
-      raise ActiveRecord::RecordInvalid, @device
-    end
+    host_reference = fetch_host_reference(connection, host_id)
 
     link = @device.zabbix_host_link || @device.zabbix_links.build(resource_type: "host")
     link.organization = @organization
     link.zabbix_connection = connection
     link.resource_type = "host"
-    link.external_id = host.hostid.to_s
-    link.external_key = host.respond_to?(:id) ? host.id.to_s : nil
-    link.name = host.name
-    link.metadata = build_metadata(host)
+    link.external_id = host_reference[:hostid].to_s
+    link.external_key = nil
+    link.name = host_reference[:name]
+    link.metadata = build_metadata(host_reference)
     link.save!
 
     cleanup_duplicate_host_links(link)
@@ -53,14 +49,25 @@ class Devices::ZabbixHostLinkUpserter
     @params.slice(:zabbix_connection_id, :zabbix_host_id)
   end
 
-  def build_metadata(host)
+  def fetch_host_reference(connection, host_id)
+    Zabbix::HostDetailsFetcher.new(connection:, hostid: host_id).reference_payload
+  rescue Zabbix::HostDetailsFetcher::UnsupportedAdapterError => e
+    @device.errors.add(:zabbix_connection_id, e.message)
+    raise ActiveRecord::RecordInvalid, @device
+  rescue Zabbix::HostDetailsFetcher::Error => e
+    @device.errors.add(:zabbix_host_id, e.message)
+    raise ActiveRecord::RecordInvalid, @device
+  end
+
+  def build_metadata(host_reference)
     existing = @device.zabbix_host_link&.metadata || {}
     existing.merge(
-      "hostid" => host.hostid.to_s,
-      "name" => host.name,
-      "available" => host.available,
-      "status" => host.status,
-      "interfaces" => host.interfaces,
+      "hostid" => host_reference[:hostid].to_s,
+      "name" => host_reference[:name],
+      "available" => host_reference[:available],
+      "status" => host_reference[:status],
+      "interfaces" => host_reference[:interfaces],
+      "metadata" => host_reference[:metadata],
       "synced_at" => Time.current.iso8601
     )
   end

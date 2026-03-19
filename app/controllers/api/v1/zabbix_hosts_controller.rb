@@ -20,6 +20,8 @@ class Api::V1::ZabbixHostsController < ApplicationController
     render json: {
       data: Zabbix::HostDetailsFetcher.new(connection: @zabbix_connection, hostid: params[:id]).call
     }, status: :ok
+  rescue Zabbix::HostDetailsFetcher::UnsupportedAdapterError => e
+    render_validation_error({ adapter: e.message }, message: "Unsupported adapter")
   rescue Zabbix::HostDetailsFetcher::Error => e
     render_validation_error({ hostid: e.message }, message: "Host inválido")
   end

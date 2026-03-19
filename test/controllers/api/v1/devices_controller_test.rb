@@ -30,25 +30,40 @@ class Api::V1::DevicesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Ativo", body.dig("data", "statuses", 1, "label")
   end
 
-  test "create device accepts zabbix host link payload and serializes link" do
-    connection = @organization.zabbix_connections.create!(name: "Conn Devices", status: "active", connection_mode: "api", base_url: "https://zabbix.local")
-    connection.zabbix_hosts.create!(hostid: "10572", name: "HOST-CORE-BRASILIA", available: "1", status: "0", interfaces: [{ ip: "10.0.0.1", type: "2", main: "1" }], metadata: { host: "core-bsb-01" })
+  test "create device accepts zabbix host link payload without local host persistence" do
+    connection = @organization.zabbix_connections.create!(name: "Conn Devices", status: "active", connection_mode: "database", db_adapter: "postgresql", db_host: "127.0.0.1", db_port: 5432, db_name: "zabbix", db_username: "zabbix", db_password: "secret")
 
-    post "/api/v1/devices", params: {
-      organization_id: @organization.id,
-      device: {
-        site_id: @site.id,
-        name: "Core Brasília",
-        hostname: "core-bsb-01",
-        role: "switch",
-        status: "active",
-        vendor: "Huawei",
-        model: "S5720",
-        management_ip: "10.0.0.1",
-        zabbix_connection_id: connection.id,
-        zabbix_host_id: "10572"
-      }
-    }, headers: auth_headers, as: :json
+    reference_payload = {
+      hostid: "10572",
+      name: "HOST-CORE-BRASILIA",
+      status: "enabled",
+      available: true,
+      interfaces: [{ ip: "10.0.0.1", dns: "", type: "snmp", main: true }],
+      metadata: { host: "core-bsb-01", inventory: { vendor: "Huawei", model: "S5720" } }
+    }
+
+    fetcher = Minitest::Mock.new
+    fetcher.expect(:reference_payload, reference_payload)
+
+    Zabbix::HostDetailsFetcher.stub(:new, fetcher) do
+      post "/api/v1/devices", params: {
+        organization_id: @organization.id,
+        device: {
+          site_id: @site.id,
+          name: "Core Brasília",
+          hostname: "core-bsb-01",
+          role: "switch",
+          status: "active",
+          vendor: "Huawei",
+          model: "S5720",
+          management_ip: "10.0.0.1",
+          zabbix_connection_id: connection.id,
+          zabbix_host_id: "10572"
+        }
+      }, headers: auth_headers, as: :json
+    end
+
+    fetcher.verify
 
     assert_response :created
 
@@ -56,6 +71,7 @@ class Api::V1::DevicesControllerTest < ActionDispatch::IntegrationTest
     assert_equal connection.id, body.dig("data", "device", "zabbix_connection_id")
     assert_equal "10572", body.dig("data", "device", "zabbix_host_id")
     assert_equal "HOST-CORE-BRASILIA", body.dig("data", "device", "zabbix_host", "label")
+    assert_equal 0, connection.zabbix_hosts.count
   end
 
   test "update device validates incomplete zabbix link payload" do
