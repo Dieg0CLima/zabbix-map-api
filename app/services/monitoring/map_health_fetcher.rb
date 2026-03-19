@@ -1,15 +1,16 @@
 class Monitoring::MapHealthFetcher
-  def initialize(network_map:)
+  def initialize(network_map:, scope: nil)
     @network_map = network_map
+    @scope = scope
   end
 
   def call
-    nodes = @network_map.map_nodes.includes(:monitoring_bindings)
+    nodes = Array(@scope || NetworkMaps::RenderableElementsQuery.new(network_map: @network_map).call)
 
     {
-      total_nodes: nodes.count,
-      monitored_nodes: nodes.count { |node| node.monitoring_bindings.any? },
-      unmonitored_nodes: nodes.count { |node| node.monitoring_bindings.none? }
+      total_sites: nodes.count,
+      monitored_sites: nodes.count { |node| node.monitoring_bindings.any? },
+      unmonitored_sites: nodes.count { |node| node.monitoring_bindings.none? }
     }
   end
 end
