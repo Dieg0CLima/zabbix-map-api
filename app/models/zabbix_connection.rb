@@ -6,6 +6,7 @@ class ZabbixConnection < ApplicationRecord
   belongs_to :organization
 
   has_many :network_maps, dependent: :nullify
+  has_many :zabbix_links, dependent: :destroy
   has_many :zabbix_hosts, class_name: "Zabbix::Host", dependent: :destroy
   has_many :zabbix_items, class_name: "Zabbix::Item", dependent: :destroy
 
