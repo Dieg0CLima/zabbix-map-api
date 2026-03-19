@@ -127,23 +127,27 @@ module Zabbix
 
       tags_by_item = {}
 
-      database_connection.with_client do |client, adapter|
-        rows = if adapter == :postgresql
-          client.exec_params(postgresql_tags_sql(items.length), items.map { |item| item[:itemid] }).to_a
-        else
-          statement = client.prepare(mysql_tags_sql(items.length))
-          begin
-            statement.execute(*items.map { |item| item[:itemid] }).to_a
-          ensure
-            statement&.close
+      begin
+        database_connection.with_client do |client, adapter|
+          rows = if adapter == :postgresql
+            client.exec_params(postgresql_tags_sql(items.length), items.map { |item| item[:itemid] }).to_a
+          else
+            statement = client.prepare(mysql_tags_sql(items.length))
+            begin
+              statement.execute(*items.map { |item| item[:itemid] }).to_a
+            ensure
+              statement&.close
+            end
+          end
+
+          rows.each do |row|
+            itemid = row["itemid"].to_s
+            tags_by_item[itemid] ||= []
+            tags_by_item[itemid] << { tag: row["tag"].to_s, value: row["value"].to_s }
           end
         end
-
-        rows.each do |row|
-          itemid = row["itemid"].to_s
-          tags_by_item[itemid] ||= []
-          tags_by_item[itemid] << { tag: row["tag"].to_s, value: row["value"].to_s }
-        end
+      rescue Zabbix::DatabaseConnection::Error => e
+        Rails.logger.warn("[Zabbix::DatabaseItemsFetcher] unable to load item tags: #{e.message}")
       end
 
       items.each do |item|

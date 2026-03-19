@@ -1,8 +1,8 @@
 class Zabbix::Observability::ItemMapper
-  TRAFFIC_IN_PATTERNS = [/\Anet\.if\.in/i, /ifin(?:octets|errors|util)?/i, /inbound/i].freeze
-  TRAFFIC_OUT_PATTERNS = [/\Anet\.if\.out/i, /ifout(?:octets|errors|util)?/i, /outbound/i].freeze
-  CPU_PATTERNS = [/system\.cpu\.util/i, /cpu utilization/i, /cpu usage/i].freeze
-  MEMORY_PATTERNS = [/vm\.memory\.size\[pused\]/i, /memory utilization/i, /memory usage/i].freeze
+  TRAFFIC_IN_PATTERNS = [/\Anet\.if\.in/i, /if(?:hc)?in(?:octets|errors|util)?/i, /inbound/i, /received bits/i, /incoming traffic/i].freeze
+  TRAFFIC_OUT_PATTERNS = [/\Anet\.if\.out/i, /if(?:hc)?out(?:octets|errors|util)?/i, /outbound/i, /sent bits/i, /outgoing traffic/i].freeze
+  CPU_PATTERNS = [/system\.cpu\.util/i, /cpu utilization/i, /cpu usage/i, /cpu busy/i, /processor load/i].freeze
+  MEMORY_PATTERNS = [/vm\.memory\.size\[pused\]/i, /vm\.memory\.util/i, /memory utilization/i, /memory usage/i, /mem usage/i, /used memory/i].freeze
 
   def initialize(items)
     @items = Array(items)
@@ -43,7 +43,7 @@ class Zabbix::Observability::ItemMapper
 
   def extract_interface_name(item)
     key = item["key_"].to_s
-    if (match = key.match(/\[(?:if(?:In|Out)Octets\.)?([^,\]]+)/i))
+    if (match = key.match(/\[(?:if(?:HC)?(?:In|Out)Octets\.)?([^,\]]+)/i))
       return match[1].to_s.tr('"', "")
     end
 
@@ -51,6 +51,9 @@ class Zabbix::Observability::ItemMapper
     if (match = name.match(/(?:Interface|net|traffic|bits|octets)[^\w-]*([[:alnum:]_\/.:-]+)/i))
       return match[1]
     end
+
+    tag_value = Array(item["tags"]).find { |tag| tag["tag"].to_s.casecmp("interface").zero? }&.dig("value")
+    return tag_value if tag_value.present?
 
     item.dig("tags", 0, "value")
   end

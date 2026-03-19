@@ -28,4 +28,28 @@ class Zabbix::Observability::FetchMetricsTest < ActiveSupport::TestCase
     assert_equal 65, payload[:memory][:usage]
     client.verify
   end
+
+  test "supports broader zabbix keys in database mode without requiring tags" do
+    @connection.update!(connection_mode: "database", db_adapter: "postgresql", db_host: "127.0.0.1", db_port: 5432, db_name: "zabbix", db_username: "zabbix", db_password: "secret", base_url: nil)
+
+    db_fetcher = Minitest::Mock.new
+    db_fetcher.expect(:call, [
+      { itemid: "1", name: "Incoming traffic on xe-0/0/0", key_: 'net.if.in[ifHCInOctets.1]', lastvalue: "1000", lastclock: Time.zone.at(1_710_879_300), units: "B", value_type: "3", description: nil, tags: [] },
+      { itemid: "2", name: "Outgoing traffic on xe-0/0/0", key_: 'net.if.out[ifHCOutOctets.1]', lastvalue: "500", lastclock: Time.zone.at(1_710_879_300), units: "B", value_type: "3", description: nil, tags: [] },
+      { itemid: "3", name: "Processor load", key_: 'system.cpu.util[,idle]', lastvalue: "31.2", lastclock: Time.zone.at(1_710_879_300), units: "%", value_type: "0", description: nil, tags: [] },
+      { itemid: "4", name: "Memory usage", key_: 'vm.memory.util', lastvalue: "64.6", lastclock: Time.zone.at(1_710_879_300), units: "%", value_type: "0", description: nil, tags: [] }
+    ])
+
+    Zabbix::DatabaseItemsFetcher.stub(:new, db_fetcher) do
+      payload = Zabbix::Observability::FetchMetrics.new(device: @device, cache: Zabbix::Observability::Cache.new(store: ActiveSupport::Cache::MemoryStore.new, ttl: 1.minute)).call
+      assert_equal 1, payload[:traffic].size
+      assert_equal 8000, payload[:traffic].first[:in_bps]
+      assert_equal 4000, payload[:traffic].first[:out_bps]
+      assert_equal 31, payload[:cpu][:usage]
+      assert_equal 65, payload[:memory][:usage]
+      assert_equal false, payload[:zabbix_unavailable]
+    end
+
+    db_fetcher.verify
+  end
 end
