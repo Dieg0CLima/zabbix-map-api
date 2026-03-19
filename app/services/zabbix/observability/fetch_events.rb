@@ -30,7 +30,7 @@ class Zabbix::Observability::FetchEvents < Zabbix::Observability::BaseFetch
 
   def fetch_problems
     if database_available?
-      result = Zabbix::DatabaseProblemsFetcher.new(connection:, hostid:, limit: 20).call
+      result = Zabbix::DatabaseProblemsFetcher.new(connection:, hostid: host_id, limit: 20).call
       return result if result.present?
     end
 

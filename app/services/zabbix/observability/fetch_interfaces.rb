@@ -31,7 +31,7 @@ class Zabbix::Observability::FetchInterfaces < Zabbix::Observability::BaseFetch
 
   def fetch_interfaces
     if database_available?
-      Zabbix::DatabaseHostDetailsFetcher.new(connection:, hostid:).call[:interfaces].map.with_index do |iface, index|
+      Zabbix::DatabaseHostDetailsFetcher.new(connection:, hostid: host_id).call[:interfaces].map.with_index do |iface, index|
         {
           "interfaceid" => index.to_s,
           "ip" => iface[:ip],
