@@ -9,6 +9,8 @@ class Devices::CreateDevice
   def call
     ActiveRecord::Base.transaction do
       device = @organization.devices.create!(device_attributes)
+      Devices::ZabbixHostLinkUpserter.new(device:, organization: @organization, params: @params).call
+      device.reload
       marker = attach_to_map(device) if add_to_map?
       [device, marker]
     end
@@ -17,7 +19,7 @@ class Devices::CreateDevice
   private
 
   def device_attributes
-    attrs = @params.deep_dup
+    attrs = @params.deep_dup.except(:zabbix_connection_id, :zabbix_host_id)
     attrs[:metadata] = (attrs[:metadata] || {}).merge("created_by_id" => @actor&.id)
     attrs[:external_id] ||= "device-#{SecureRandom.uuid}" if Device.attribute_names.include?("external_id")
     attrs[:status] ||= "active" if Device.attribute_names.include?("status")
