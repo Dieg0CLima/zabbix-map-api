@@ -6,10 +6,12 @@ module Zabbix
     class Error < StandardError; end
     class UnsupportedAdapterError < Error; end
 
-    def initialize(connection:, hostid: nil, limit: nil)
+    def initialize(connection:, hostid: nil, limit: nil, include_tags: false, include_extended_fields: false)
       @connection = connection
       @hostid = hostid.presence
       @limit = normalize_limit(limit)
+      @include_tags = include_tags
+      @include_extended_fields = include_extended_fields
     end
 
     def call
@@ -28,7 +30,9 @@ module Zabbix
         end
       end
 
-      rows.map { |row| normalize_row(row) }
+      normalized = rows.map { |row| normalize_row(row) }
+      attach_tags!(normalized) if @include_tags
+      normalized
     rescue Zabbix::DatabaseConnection::UnsupportedAdapterError => e
       raise UnsupportedAdapterError, e.message
     rescue Zabbix::DatabaseConnection::Error => e
@@ -52,6 +56,7 @@ module Zabbix
           i.status::text AS status,
           i.state::text AS state,
           i.lastvalue::text AS lastvalue,
+          #{postgresql_extended_fields_sql}
           i.lastclock::text AS lastclock,
           h.hostid::text AS hostid,
           h.host
@@ -74,6 +79,7 @@ module Zabbix
           CAST(i.status AS CHAR) AS status,
           CAST(i.state AS CHAR) AS state,
           CAST(i.lastvalue AS CHAR) AS lastvalue,
+          #{mysql_extended_fields_sql}
           CAST(i.lastclock AS CHAR) AS lastclock,
           CAST(h.hostid AS CHAR) AS hostid,
           h.host
@@ -83,6 +89,20 @@ module Zabbix
         ORDER BY i.itemid
         LIMIT ?
       SQL
+    end
+
+
+
+    def postgresql_extended_fields_sql
+      return "NULL::text AS prevvalue, NULL::text AS description," unless @include_extended_fields
+
+      "i.prevvalue::text AS prevvalue, i.description,"
+    end
+
+    def mysql_extended_fields_sql
+      return "NULL AS prevvalue, NULL AS description," unless @include_extended_fields
+
+      "CAST(i.prevvalue AS CHAR) AS prevvalue, i.description,"
     end
 
     def sql_params
@@ -102,12 +122,76 @@ module Zabbix
         status: row["status"],
         state: row["state"],
         lastvalue: row["lastvalue"],
+        prevvalue: row["prevvalue"],
         lastclock: parse_lastclock(row["lastclock"]),
+        description: row["description"],
+        tags: [],
         host: {
           hostid: row["hostid"],
           name: row["host"]
         }
       }
+    end
+
+
+
+    def attach_tags!(items)
+      return if items.empty?
+
+      tags_by_item = {}
+
+      begin
+        database_connection.with_client do |client, adapter|
+          rows = if adapter == :postgresql
+            client.exec_params(postgresql_tags_sql(items.length), items.map { |item| item[:itemid] }).to_a
+          else
+            statement = client.prepare(mysql_tags_sql(items.length))
+            begin
+              statement.execute(*items.map { |item| item[:itemid] }).to_a
+            ensure
+              statement&.close
+            end
+          end
+
+          rows.each do |row|
+            itemid = row["itemid"].to_s
+            tags_by_item[itemid] ||= []
+            tags_by_item[itemid] << { tag: row["tag"].to_s, value: row["value"].to_s }
+          end
+        end
+      rescue Zabbix::DatabaseConnection::Error => e
+        Rails.logger.warn("[Zabbix::DatabaseItemsFetcher] unable to load item tags: #{e.message}")
+      end
+
+      items.each do |item|
+        item[:tags] = tags_by_item[item[:itemid].to_s] || []
+      end
+    end
+
+    def postgresql_tags_sql(count)
+      placeholders = (1..count).map { |index| "$#{index}" }.join(", ")
+      <<~SQL.squish
+        SELECT
+          itemid::text AS itemid,
+          tag,
+          value
+        FROM item_tag
+        WHERE itemid IN (#{placeholders})
+        ORDER BY itemid, tag, value
+      SQL
+    end
+
+    def mysql_tags_sql(count)
+      placeholders = (["?"] * count).join(", ")
+      <<~SQL.squish
+        SELECT
+          CAST(itemid AS CHAR) AS itemid,
+          tag,
+          value
+        FROM item_tag
+        WHERE itemid IN (#{placeholders})
+        ORDER BY itemid, tag, value
+      SQL
     end
 
     def normalize_limit(limit)
