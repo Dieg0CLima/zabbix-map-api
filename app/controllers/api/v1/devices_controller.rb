@@ -3,14 +3,14 @@ class Api::V1::DevicesController < Api::V1::BaseController
   before_action :set_device, only: %i[show update destroy site_link]
 
   def index
-    devices = current_organization.devices.order(:id)
+    devices = current_organization.devices.includes(:zabbix_host_link).order(:id)
     devices = devices.where(site_id: params[:site_id]) if params[:site_id].present?
     devices = devices.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
     render_data(data: devices.map { |device| Api::V1::DeviceSerializer.new(device).as_json })
   end
 
   def dropdown
-    devices = current_organization.devices.includes(:site).order(:name)
+    devices = current_organization.devices.includes(:site, :zabbix_host_link).order(:name)
     devices = devices.where(site_id: params[:site_id]) if params[:site_id].present?
     devices = devices.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
     render_data(data: devices.limit(50).map { |device| { value: device.id, label: device.name, code: device.hostname || device.id.to_s, meta: { site_id: device.site_id, role: device.role, status: device.status } } })
@@ -60,7 +60,7 @@ class Api::V1::DevicesController < Api::V1::BaseController
   def device_params
     raw = params.require(:device)
     raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
-    raw.permit(:site_id, :name, :hostname, :role, :vendor, :model, :serial_number, :management_ip, :status, metadata: {})
+    raw.permit(:site_id, :name, :hostname, :role, :vendor, :model, :serial_number, :management_ip, :status, :zabbix_connection_id, :zabbix_host_id, metadata: {})
   end
 
   def map_context_params

@@ -16,6 +16,14 @@ class Api::V1::ZabbixHostsController < ApplicationController
     render_service_unavailable(message: "Unable to fetch hosts from Zabbix database", details: e.message)
   end
 
+  def show
+    render json: {
+      data: Zabbix::HostDetailsFetcher.new(connection: @zabbix_connection, hostid: params[:id]).call
+    }, status: :ok
+  rescue Zabbix::HostDetailsFetcher::Error => e
+    render_validation_error({ hostid: e.message }, message: "Host inválido")
+  end
+
   def dropdown
     result = ZabbixConnections::HostDropdownFetcher.new(
       connection: @zabbix_connection,

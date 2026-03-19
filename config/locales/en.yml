@@ -29,3 +29,21 @@
 
 en:
   hello: "Hello world"
+
+  devices:
+    catalogs:
+      generic: "Genérico"
+      router: "Router"
+      switch: "Switch"
+      firewall: "Firewall"
+      gateway: "Gateway"
+      server: "Servidor"
+      endpoint: "Endpoint"
+      olt: "OLT"
+      cto: "CTO"
+      splitter: "Splitter"
+      planned: "Planejado"
+      active: "Ativo"
+      maintenance: "Em manutenção"
+      offline: "Offline"
+      decommissioned: "Descomissionado"

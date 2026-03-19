@@ -21,12 +21,15 @@ class ZabbixConnections::HostDropdownFetcher
     return persisted_dropdown_hosts unless @connection.db_enabled?
 
     fetched_hosts.map do |host|
-      {
-        value: host[:hostid].to_s,
-        label: host[:name].presence || host[:host].to_s,
-        hostid: host[:hostid].to_s,
-        available: db_status_available?(host[:status])
-      }
+      transient_host = Struct.new(:hostid, :name, :status, :available, :interfaces, :metadata, keyword_init: true).new(
+        hostid: host[:hostid],
+        name: host[:name],
+        status: host[:status],
+        available: host[:available],
+        interfaces: host[:interfaces] || [],
+        metadata: host[:metadata] || {}
+      )
+      Zabbix::HostPayloadBuilder.new(host: transient_host).dropdown_payload
     end
   end
 
@@ -35,12 +38,7 @@ class ZabbixConnections::HostDropdownFetcher
     scope = scope.where("name ILIKE :q OR hostid ILIKE :q", q: "%#{@query}%") if @query.present?
 
     scope.order(:name, :hostid).limit(@limit).map do |host|
-      {
-        value: host.hostid.to_s,
-        label: host.name,
-        hostid: host.hostid.to_s,
-        available: persisted_available?(host.available)
-      }
+      Zabbix::HostPayloadBuilder.new(host:).dropdown_payload
     end
   end
 
@@ -50,17 +48,6 @@ class ZabbixConnections::HostDropdownFetcher
     raise UnsupportedAdapterError, e.message
   rescue Zabbix::DatabaseHostsFetcher::Error => e
     raise Error, e.message
-  end
-
-  def db_status_available?(status)
-    status.to_s == "0"
-  end
-
-  def persisted_available?(value)
-    return value if value == true || value == false
-
-    normalized = value.to_s.strip.downcase
-    normalized.in?(["1", "true", "up", "available", "enabled"])
   end
 
   def normalize_limit(limit)

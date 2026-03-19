@@ -6,9 +6,12 @@ class Devices::UpdateDevice
   end
 
   def call
-    attrs = @params.deep_dup
-    attrs[:metadata] = (@device.metadata || {}).merge(attrs[:metadata] || {}).merge("updated_by_id" => @actor&.id)
-    @device.update!(attrs)
-    @device
+    ActiveRecord::Base.transaction do
+      attrs = @params.deep_dup.except(:zabbix_connection_id, :zabbix_host_id)
+      attrs[:metadata] = (@device.metadata || {}).merge(attrs[:metadata] || {}).merge("updated_by_id" => @actor&.id)
+      @device.update!(attrs)
+      Devices::ZabbixHostLinkUpserter.new(device: @device, organization: @device.organization, params: @params).call
+      @device.reload
+    end
   end
 end

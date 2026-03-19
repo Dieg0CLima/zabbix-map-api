@@ -21,6 +21,7 @@ Rails.application.routes.draw do
           get :dropdown
         end
       end
+      get "devices/catalogs", to: "device_catalogs#index"
       resources :devices do
         collection do
           get :dropdown
@@ -85,7 +86,7 @@ Rails.application.routes.draw do
       end
 
       resources :zabbix_connections do
-        resources :zabbix_hosts, only: :index do
+        resources :zabbix_hosts, only: %i[index show] do
           collection do
             get :dropdown
           end
