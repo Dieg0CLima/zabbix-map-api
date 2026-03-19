@@ -19,12 +19,19 @@ class Zabbix::Observability::FetchDeviceSummaryTest < ActiveSupport::TestCase
       def default_payload = { traffic: [], cpu: { usage: nil }, memory: { usage: nil } }
     end
 
-    service = Zabbix::Observability::FetchDeviceSummary.new(device:, events_service: failing_events, metrics_service: failing_metrics)
+    failing_recent_data = Class.new do
+      def initialize(device:); end
+      def call = raise(Zabbix::Client::TransportError, "timeout")
+      def default_payload = { host: { id: "30303", label: "FW-01" }, items: [], total: 0 }
+    end
+
+    service = Zabbix::Observability::FetchDeviceSummary.new(device:, events_service: failing_events, metrics_service: failing_metrics, recent_data_service: failing_recent_data)
     payload = service.call
 
     assert_equal "unknown", payload[:status]
     assert_equal true, payload[:zabbix_unavailable]
     assert_equal [], payload[:interfaces]
+    assert_equal [], payload.dig(:recent_data, :items)
   end
 
   test "uses cache to avoid repeated upstream calls" do
@@ -59,6 +66,17 @@ class Zabbix::Observability::FetchDeviceSummaryTest < ActiveSupport::TestCase
     end
     fake_metrics.calls = calls
 
+    fake_recent_data = Class.new do
+      def initialize(device:); @calls = self.class.calls; end
+      def self.calls=(calls); @calls = calls; end
+      def self.calls; @calls; end
+      def call
+        @calls[:value] += 1
+        { host: { id: "40404", label: "OLT-01" }, items: [], total: 0, zabbix_unavailable: false }
+      end
+    end
+    fake_recent_data.calls = calls
+
     fake_interfaces = Class.new do
       def initialize(device:); @calls = self.class.calls; end
       def self.calls=(calls); @calls = calls; end
@@ -70,9 +88,9 @@ class Zabbix::Observability::FetchDeviceSummaryTest < ActiveSupport::TestCase
     end
     fake_interfaces.calls = calls
 
-    service = Zabbix::Observability::FetchDeviceSummary.new(device:, cache:, events_service: fake_events, metrics_service: fake_metrics, interfaces_service: fake_interfaces)
+    service = Zabbix::Observability::FetchDeviceSummary.new(device:, cache:, events_service: fake_events, metrics_service: fake_metrics, interfaces_service: fake_interfaces, recent_data_service: fake_recent_data)
     2.times { service.call }
 
-    assert_equal 3, calls[:value]
+    assert_equal 4, calls[:value]
   end
 end

@@ -34,6 +34,47 @@ class Api::V1::DeviceObservabilityControllerTest < ActionDispatch::IntegrationTe
     fetcher.verify
   end
 
+
+
+  test "recent_data returns normalized host recent data payload" do
+    recent_payload = {
+      host: { id: "10101", label: "RTR-OBS" },
+      items: [
+        {
+          id: "9001",
+          host_id: "10101",
+          host_label: "RTR-OBS",
+          name: "Latência",
+          key: "icmppingsec",
+          last_check_at: "2026-03-19T10:00:00Z",
+          last_check_ago_seconds: 13,
+          last_value: "12.67ms",
+          previous_value: "12.64ms",
+          change: { raw: 0.03, display: "+0.03ms", direction: "up" },
+          units: "ms",
+          value_type: "float",
+          status: "active",
+          tags: [{ tag: "Application", value: "ICMP" }],
+          applications: ["ICMP"],
+          description: nil
+        }
+      ],
+      total: 1,
+      zabbix_unavailable: false
+    }
+
+    fetcher = Minitest::Mock.new
+    fetcher.expect(:call, recent_payload)
+
+    Zabbix::Observability::FetchRecentData.stub(:new, fetcher) do
+      get "/api/v1/devices/#{@device.id}/observability/recent_data", params: { organization_id: @organization.id }, headers: auth_headers, as: :json
+    end
+
+    assert_response :ok
+    assert_equal "Latência", response.parsed_body.dig("data", "items", 0, "name")
+    fetcher.verify
+  end
+
   private
 
   def auth_headers

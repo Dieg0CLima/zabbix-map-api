@@ -34,6 +34,7 @@ Rails.application.routes.draw do
           get :events
           get :interfaces
           get :metrics
+          get :recent_data
         end
         resources :zabbix_links, controller: "zabbix_links", only: %i[index create]
       end
@@ -48,6 +49,7 @@ Rails.application.routes.draw do
           get :available_devices
           get :health
           get :metrics
+          get :recent_data
           get :events
         end
 

@@ -1,9 +1,10 @@
 class Zabbix::Observability::FetchDeviceSummary < Zabbix::Observability::BaseFetch
-  def initialize(device:, events_service: Zabbix::Observability::FetchEvents, interfaces_service: Zabbix::Observability::FetchInterfaces, metrics_service: Zabbix::Observability::FetchMetrics, **kwargs)
+  def initialize(device:, events_service: Zabbix::Observability::FetchEvents, interfaces_service: Zabbix::Observability::FetchInterfaces, metrics_service: Zabbix::Observability::FetchMetrics, recent_data_service: Zabbix::Observability::FetchRecentData, **kwargs)
     super(device:, **kwargs)
     @events_service = events_service
     @interfaces_service = interfaces_service
     @metrics_service = metrics_service
+    @recent_data_service = recent_data_service
   end
 
   def call
@@ -11,12 +12,14 @@ class Zabbix::Observability::FetchDeviceSummary < Zabbix::Observability::BaseFet
       events = @events_service.new(device:).call
       metrics = @metrics_service.new(device:).call
       interfaces = @interfaces_service.new(device:).call.fetch(:data)
+      recent_data = @recent_data_service.new(device:).call
 
       {
         status: summarize_status(events:),
         events:,
         interfaces:,
         metrics:,
+        recent_data:,
         zabbix_unavailable: events[:zabbix_unavailable] || metrics[:zabbix_unavailable],
         last_updated_at: Time.current.utc.iso8601
       }
@@ -28,6 +31,7 @@ class Zabbix::Observability::FetchDeviceSummary < Zabbix::Observability::BaseFet
       events: @events_service.new(device:).send(:default_payload),
       interfaces: [],
       metrics: @metrics_service.new(device:).send(:default_payload),
+      recent_data: @recent_data_service.new(device:).send(:default_payload),
       zabbix_unavailable: true,
       last_updated_at: Time.current.utc.iso8601
     }

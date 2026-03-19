@@ -17,6 +17,10 @@ class Api::V1::DeviceObservabilityController < Api::V1::BaseController
     render_data(data: Api::V1::DeviceObservabilityMetricsSerializer.new(metrics_service.call).as_json)
   end
 
+  def recent_data
+    render_data(data: Api::V1::DeviceObservabilityRecentDataSerializer.new(recent_data_service.call).as_json)
+  end
+
   private
 
   def set_device
@@ -37,5 +41,9 @@ class Api::V1::DeviceObservabilityController < Api::V1::BaseController
 
   def metrics_service
     Zabbix::Observability::FetchMetrics.new(device: @device)
+  end
+
+  def recent_data_service
+    Zabbix::Observability::FetchRecentData.new(device: @device, limit: params[:limit])
   end
 end
