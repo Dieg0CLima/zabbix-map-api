@@ -30,6 +30,11 @@ Rails.application.routes.draw do
           patch :site_link
         end
         resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]
+        resource :observability, controller: "device_observability", only: :show do
+          get :events
+          get :interfaces
+          get :metrics
+        end
         resources :zabbix_links, controller: "zabbix_links", only: %i[index create]
       end
       get "device_interfaces/:interface_id/zabbix_links", to: "zabbix_links#index"
