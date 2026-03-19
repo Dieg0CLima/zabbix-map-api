@@ -9,15 +9,7 @@ class Zabbix::Observability::FetchRecentData < Zabbix::Observability::BaseFetch
   def call
     with_cache("recent-data") do
       safe_fetch(default: default_payload) do
-        items = client.call("item.get", {
-          hostids: [host_id],
-          monitored: true,
-          output: ["itemid", "name", "key_", "lastvalue", "prevvalue", "lastclock", "units", "value_type", "description", "state", "status"],
-          selectTags: ["tag", "value"],
-          sortfield: ["name"],
-          sortorder: "ASC",
-          limit: @limit
-        })
+        items = fetch_items
 
         {
           host: {

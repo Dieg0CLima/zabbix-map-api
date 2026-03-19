@@ -11,7 +11,8 @@ class Zabbix::Observability::FetchDeviceSummary < Zabbix::Observability::BaseFet
     with_cache("summary") do
       events = @events_service.new(device:).call
       metrics = @metrics_service.new(device:).call
-      interfaces = @interfaces_service.new(device:).call.fetch(:data)
+      interfaces_payload = @interfaces_service.new(device:).call
+      interfaces = interfaces_payload.fetch(:data)
       recent_data = @recent_data_service.new(device:).call
 
       {
@@ -20,7 +21,7 @@ class Zabbix::Observability::FetchDeviceSummary < Zabbix::Observability::BaseFet
         interfaces:,
         metrics:,
         recent_data:,
-        zabbix_unavailable: events[:zabbix_unavailable] || metrics[:zabbix_unavailable],
+        zabbix_unavailable: events[:zabbix_unavailable] || metrics[:zabbix_unavailable] || interfaces_payload[:zabbix_unavailable] || recent_data[:zabbix_unavailable],
         last_updated_at: Time.current.utc.iso8601
       }
     end

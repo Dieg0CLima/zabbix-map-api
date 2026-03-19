@@ -10,10 +10,7 @@ class Zabbix::Observability::FetchInterfaces < Zabbix::Observability::BaseFetch
         traffic_entries = @metrics_service.new(device:).call.fetch(:traffic, [])
         traffic_index = traffic_entries.index_by { |entry| entry[:interface] }
 
-        interfaces = client.call("hostinterface.get", {
-          hostids: [host_id],
-          output: ["interfaceid", "ip", "dns", "main", "type", "available", "error"]
-        }).each_with_index.map do |iface, index|
+        interfaces = fetch_interfaces.each_with_index.map do |iface, index|
           interface_name = infer_name(iface, traffic_entries[index])
           {
             name: interface_name,
@@ -31,6 +28,28 @@ class Zabbix::Observability::FetchInterfaces < Zabbix::Observability::BaseFetch
   end
 
   private
+
+  def fetch_interfaces
+    if database_available?
+      Zabbix::DatabaseHostDetailsFetcher.new(connection:, hostid:).call[:interfaces].map.with_index do |iface, index|
+        {
+          "interfaceid" => index.to_s,
+          "ip" => iface[:ip],
+          "dns" => iface[:dns],
+          "main" => iface[:main] ? "1" : "0",
+          "type" => iface[:type].to_s,
+          "available" => iface[:main] ? "1" : "0"
+        }
+      end
+    elsif api_available?
+      client.call("hostinterface.get", {
+        hostids: [host_id],
+        output: ["interfaceid", "ip", "dns", "main", "type", "available", "error"]
+      })
+    else
+      []
+    end
+  end
 
   def default_payload
     { data: [] }

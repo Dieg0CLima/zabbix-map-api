@@ -30,7 +30,15 @@ class Zabbix::Observability::BaseFetch
   end
 
   def observability_available?
-    connection.present? && host_id.present? && connection.api_enabled?
+    connection.present? && host_id.present?
+  end
+
+  def api_available?
+    observability_available? && connection.api_enabled?
+  end
+
+  def database_available?
+    observability_available? && connection.db_enabled?
   end
 
   def unavailable_payload(data = nil)
@@ -45,7 +53,7 @@ class Zabbix::Observability::BaseFetch
     return default unless observability_available?
 
     yield
-  rescue Zabbix::Client::Error, Timeout::Error => e
+  rescue Zabbix::Client::Error, Zabbix::DatabaseConnection::Error, Zabbix::DatabaseItemsFetcher::Error, Zabbix::DatabaseProblemsFetcher::Error, Zabbix::DatabaseHostDetailsFetcher::Error, Timeout::Error => e
     Rails.logger.warn("[Zabbix::Observability] #{self.class.name} failed for device=#{device.id}: #{e.class}: #{e.message}")
     default.merge(zabbix_unavailable: true)
   end

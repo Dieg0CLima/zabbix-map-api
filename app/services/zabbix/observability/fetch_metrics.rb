@@ -27,14 +27,32 @@ class Zabbix::Observability::FetchMetrics < Zabbix::Observability::BaseFetch
   end
 
   def fetch_items
-    client.call("item.get", {
-      hostids: [host_id],
-      webitems: true,
-      monitored: true,
-      output: ["itemid", "name", "key_", "lastvalue", "lastclock", "units", "value_type", "description"],
-      selectTags: "extend",
-      sortfield: "name"
-    })
+    if database_available?
+      Zabbix::DatabaseItemsFetcher.new(connection:, hostid:, limit: 500, include_tags: true).call.map do |item|
+        {
+          "itemid" => item[:itemid],
+          "name" => item[:name],
+          "key_" => item[:key_],
+          "lastvalue" => item[:lastvalue],
+          "lastclock" => item[:lastclock]&.to_i.to_s,
+          "units" => item[:units],
+          "value_type" => item[:value_type],
+          "description" => item[:description],
+          "tags" => item[:tags].map { |tag| { "tag" => tag[:tag], "value" => tag[:value] } }
+        }
+      end
+    elsif api_available?
+      client.call("item.get", {
+        hostids: [host_id],
+        webitems: true,
+        monitored: true,
+        output: ["itemid", "name", "key_", "lastvalue", "lastclock", "units", "value_type", "description"],
+        selectTags: "extend",
+        sortfield: "name"
+      })
+    else
+      []
+    end
   end
 
   def build_traffic(items)

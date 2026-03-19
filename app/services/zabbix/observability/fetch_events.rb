@@ -29,6 +29,13 @@ class Zabbix::Observability::FetchEvents < Zabbix::Observability::BaseFetch
   end
 
   def fetch_problems
+    if database_available?
+      result = Zabbix::DatabaseProblemsFetcher.new(connection:, hostid:, limit: 20).call
+      return result if result.present?
+    end
+
+    return [] unless api_available?
+
     result = client.call("problem.get", {
       hostids: [host_id],
       recent: true,
