@@ -6,11 +6,12 @@ module Zabbix
     class Error < StandardError; end
     class UnsupportedAdapterError < Error; end
 
-    def initialize(connection:, hostid: nil, limit: nil, include_tags: false)
+    def initialize(connection:, hostid: nil, limit: nil, include_tags: false, include_extended_fields: false)
       @connection = connection
       @hostid = hostid.presence
       @limit = normalize_limit(limit)
       @include_tags = include_tags
+      @include_extended_fields = include_extended_fields
     end
 
     def call
@@ -55,9 +56,8 @@ module Zabbix
           i.status::text AS status,
           i.state::text AS state,
           i.lastvalue::text AS lastvalue,
-          i.prevvalue::text AS prevvalue,
+          #{postgresql_extended_fields_sql}
           i.lastclock::text AS lastclock,
-          i.description,
           h.hostid::text AS hostid,
           h.host
         FROM items i
@@ -79,9 +79,8 @@ module Zabbix
           CAST(i.status AS CHAR) AS status,
           CAST(i.state AS CHAR) AS state,
           CAST(i.lastvalue AS CHAR) AS lastvalue,
-          CAST(i.prevvalue AS CHAR) AS prevvalue,
+          #{mysql_extended_fields_sql}
           CAST(i.lastclock AS CHAR) AS lastclock,
-          i.description,
           CAST(h.hostid AS CHAR) AS hostid,
           h.host
         FROM items i
@@ -90,6 +89,20 @@ module Zabbix
         ORDER BY i.itemid
         LIMIT ?
       SQL
+    end
+
+
+
+    def postgresql_extended_fields_sql
+      return "NULL::text AS prevvalue, NULL::text AS description," unless @include_extended_fields
+
+      "i.prevvalue::text AS prevvalue, i.description,"
+    end
+
+    def mysql_extended_fields_sql
+      return "NULL AS prevvalue, NULL AS description," unless @include_extended_fields
+
+      "CAST(i.prevvalue AS CHAR) AS prevvalue, i.description,"
     end
 
     def sql_params

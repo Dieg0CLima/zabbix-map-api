@@ -28,7 +28,7 @@ class Zabbix::Observability::FetchMetrics < Zabbix::Observability::BaseFetch
 
   def fetch_items
     if database_available?
-      Zabbix::DatabaseItemsFetcher.new(connection:, hostid: host_id, limit: 500, include_tags: false).call.map do |item|
+      Zabbix::DatabaseItemsFetcher.new(connection:, hostid: host_id, limit: 500, include_tags: false, include_extended_fields: false).call.map do |item|
         {
           "itemid" => item[:itemid],
           "name" => item[:name],
