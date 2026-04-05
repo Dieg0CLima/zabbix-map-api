@@ -1,10 +1,11 @@
 class NetworkCableEvent < ApplicationRecord
   EVENT_TYPES = %w[
     created
+    updated
+    deleted
     metadata_updated
     status_changed
     geometry_changed
-    updated
     incident
     maintenance
     deactivated

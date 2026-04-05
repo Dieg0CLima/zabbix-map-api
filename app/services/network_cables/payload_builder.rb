@@ -12,6 +12,8 @@ class NetworkCables::PayloadBuilder
       target_pop_id: @cable.target_pop&.external_id || @cable.target_pop_id,
       source_node_id: @cable.source_node&.external_id || @cable.source_node_id,
       target_node_id: @cable.target_node&.external_id || @cable.target_node_id,
+      source_element_id: @cable.source_element_id,
+      target_element_id: @cable.target_element_id,
       label: @cable.label,
       cable_type: @cable.cable_type,
       status: @cable.status,
@@ -32,10 +34,10 @@ class NetworkCables::PayloadBuilder
       {
         id: point.id,
         position: point.position,
-        x: point.x,
-        y: point.y,
-        lat: point.x,
-        lng: point.y
+        x: point.x.to_f,
+        y: point.y.to_f,
+        lat: point.x.to_f,
+        lng: point.y.to_f
       }
     end
   end

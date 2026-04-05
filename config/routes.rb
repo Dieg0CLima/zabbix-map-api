@@ -27,6 +27,7 @@ Rails.application.routes.draw do
           get :dropdown
         end
         member do
+          get :dashboard
           patch :site_link
         end
         resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]
@@ -79,6 +80,7 @@ Rails.application.routes.draw do
         end
         resources :network_cables do
           resources :events, controller: "network_cable_events", only: :index
+          resources :network_cable_items, only: %i[index create destroy]
         end
         resource :editor_state, controller: "network_map_editor_states", only: %i[show update]
         resource :metrics, controller: "network_map_metrics", only: :show

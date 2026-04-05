@@ -6,13 +6,14 @@ class NetworkCables::PointNormalizer
   end
 
   def self.normalize_point(point, index:)
-    x = point[:x].nil? ? point[:lat] : point[:x]
-    y = point[:y].nil? ? point[:lng] : point[:y]
+    p = point.respond_to?(:with_indifferent_access) ? point.with_indifferent_access : point
+    x = p[:x].nil? ? p[:lat] : p[:x]
+    y = p[:y].nil? ? p[:lng] : p[:y]
 
     raise ArgumentError, "point coordinates are required" if x.nil? || y.nil?
 
     {
-      position: point[:position] || index,
+      position: p[:position] || index,
       x:,
       y:
     }

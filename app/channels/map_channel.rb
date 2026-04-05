@@ -8,6 +8,7 @@ class MapChannel < ApplicationCable::Channel
     transmit({
       type: "initial",
       metrics: build_metrics,
+      cable_metrics: build_cable_metrics,
       events: build_events
     })
   end
@@ -25,6 +26,7 @@ class MapChannel < ApplicationCable::Channel
     transmit({
       type: "refresh",
       metrics: build_metrics,
+      cable_metrics: build_cable_metrics,
       events: build_events(since: data["since"])
     })
   end
@@ -49,6 +51,10 @@ class MapChannel < ApplicationCable::Channel
 
   def build_metrics
     NetworkMaps::MetricsPayloadBuilder.new(network_map: @network_map).call
+  end
+
+  def build_cable_metrics
+    NetworkMaps::CableMetricsPayloadBuilder.new(network_map: @network_map).call
   end
 
   def build_events(since: nil)

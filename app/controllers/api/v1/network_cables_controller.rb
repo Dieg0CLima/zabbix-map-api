@@ -61,7 +61,8 @@ class Api::V1::NetworkCablesController < ApplicationController
   private
 
   def set_network_map
-    @network_map = scoped_network_maps.find(params[:network_map_id])
+    id = params[:legacy_network_map_id] || params[:network_map_id]
+    @network_map = scoped_network_maps.find(id)
   end
 
   def set_network_cable
@@ -75,6 +76,8 @@ class Api::V1::NetworkCablesController < ApplicationController
       :target_pop_id,
       :source_node_id,
       :target_node_id,
+      :source_element_id,
+      :target_element_id,
       :label,
       :cable_type,
       :status,

@@ -13,6 +13,7 @@ class NetworkCable < ApplicationRecord
 
   has_many :network_cable_points, dependent: :destroy
   has_many :network_cable_events, dependent: :destroy
+  has_many :network_cable_items, dependent: :destroy
 
   before_validation :resolve_pop_external_ids
   before_validation :apply_default_visuals
@@ -25,10 +26,6 @@ class NetworkCable < ApplicationRecord
 
   validates :cable_type, inclusion: { in: CABLE_TYPES }
   validates :status, inclusion: { in: STATUSES }
-  validates :source_node_id, uniqueness: {
-    scope: [:target_node_id, :network_map_id],
-    message: "already has a cable in this map"
-  }, if: -> { source_node_id.present? && target_node_id.present? }
   validates :source_node_id,
             comparison: { other_than: :target_node_id },
             if: -> { source_node_id.present? && target_node_id.present? }
@@ -95,7 +92,7 @@ class NetworkCable < ApplicationRecord
   end
 
   def source_binding_required
-    return if source_pop_id.present? || source_node_id.present?
+    return if source_pop_id.present? || source_node_id.present? || source_element_id.present?
 
     errors.add(:source_pop_id, "é obrigatório")
   end

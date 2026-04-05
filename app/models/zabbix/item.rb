@@ -10,6 +10,7 @@ module Zabbix
                optional: true
 
     has_many :map_node_items, dependent: :destroy
+    has_many :network_cable_items, dependent: :destroy
 
     validates :itemid, presence: true, uniqueness: { scope: :zabbix_connection_id }
     validates :key_, presence: true
