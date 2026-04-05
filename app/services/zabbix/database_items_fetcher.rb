@@ -50,9 +50,6 @@ module Zabbix
           i.value_type::text AS value_type,
           i.units,
           i.status::text AS status,
-          i.state::text AS state,
-          i.lastvalue::text AS lastvalue,
-          i.lastclock::text AS lastclock,
           h.hostid::text AS hostid,
           h.host
         FROM items i
@@ -72,9 +69,6 @@ module Zabbix
           CAST(i.value_type AS CHAR) AS value_type,
           i.units,
           CAST(i.status AS CHAR) AS status,
-          CAST(i.state AS CHAR) AS state,
-          CAST(i.lastvalue AS CHAR) AS lastvalue,
-          CAST(i.lastclock AS CHAR) AS lastclock,
           CAST(h.hostid AS CHAR) AS hostid,
           h.host
         FROM items i
@@ -100,9 +94,6 @@ module Zabbix
         value_type: row["value_type"],
         units: row["units"],
         status: row["status"],
-        state: row["state"],
-        lastvalue: row["lastvalue"],
-        lastclock: parse_lastclock(row["lastclock"]),
         host: {
           hostid: row["hostid"],
           name: row["host"]

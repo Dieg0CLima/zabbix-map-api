@@ -77,6 +77,13 @@ A modelagem para representar cabos e linhas entre equipamentos deve seguir este 
 - não permitir duplicidade da mesma conexão no mesmo mapa (`network_map_id + source_node_id + target_node_id`);
 - pontos de cabo devem ter `position` única por cabo.
 
+### 3.2.2 Contrato de mapa enriquecido
+
+- `GET /api/v1/network_maps/:id` entrega `pops`, `nodes` e `cables`, mas também agrupa cada conjunto em `layers` (com label/ordem) e expõe filtros derivados (`node_kind`, `status`, `tags`, `tipo de cabo`) para que o frontend já monte as camadas visuais.
+- Cada nó traz `zabbix_ref`, coordenadas, `metadata`, `actions` e `zabbix_host` (status, availability, inventory, tags, suggested attributes e `items_summary` com últimas leituras); essa informação vem direto do cache `zabbix_hosts`/`zabbix_items`.
+- Cada cabo inclui `points`, `metadata`, comprimento, owner/path e `zabbix_status` calculado a partir dos hosts conectados, permitindo cores/padrões/alertas condicionais.
+- O payload inclui `zabbix_context` com a conexão (`last_synced_at`, `secrets`, `status`), métricas (`Zabbix::MetricsFetcher`), problemas (`Zabbix::ProblemFetcher`) e modelos de URLs para abrir hosts ou sincronizar dados. O backend mantém a lógica de coleta e só expõe os dados já normalizados para o frontend pintar o mapa em tempo real.
+
 ## 3.3 Fluxo de integração com Zabbix
 
 1. Usuário autentica na API (`JWT`).

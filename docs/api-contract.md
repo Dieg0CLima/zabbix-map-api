@@ -79,38 +79,207 @@ No frontend, cada cabo é renderizado assim:
 
 ## 3) Exemplo de payload (GET /api/v1/network_maps/:id)
 
+O payload continua retornando `pops`, `nodes` e `cables`, mas agora com:
+
+- **layers**: descrição e agrupamento pré-definido (`pops`, `nodes`, `cables`) para permitir renderizar camadas com ordem, labels e metadata associada.
+- **filters**: coleções derivadas dos metadados (PoP, tipos de nós, status Zabbix, tags, tipos de cabo) além de ações sugeridas para o frontend.
+- **nodes/cables enriquecidos**: cada nó traz `zabbix_ref`, `zabbix_status`, `zabbix_host`, `zabbix_host_tags`, `actions`, coordenadas, ícones e metadata; cabos entregam `status`, `zabbix_status`, `points` completos e indicação da camada.
+- **zabbix_context**: conexão, métricas, problemas (eventos), dados de sincronização e URLs/templates para abrir hosts no Zabbix.
+
 ```json
 {
   "data": {
     "id": 10,
     "name": "Datacenter - Core",
     "source_type": "hybrid",
-    "nodes": [
-      { "id": 101, "label": "SW-Core-01", "node_kind": "switch", "x": 300.0, "y": 220.0 },
-      { "id": 102, "label": "FW-Edge-01", "node_kind": "firewall", "x": 760.0, "y": 210.0 }
-    ],
-    "cables": [
-      {
-        "id": 501,
-        "label": "Uplink 10G",
-        "cable_type": "fiber",
-        "status": "up",
-        "source_node_id": 101,
-        "target_node_id": 102,
-        "bandwidth_mbps": 10000,
-        "points": [
-          { "position": 0, "x": 470.0, "y": 170.0 },
-          { "position": 1, "x": 620.0, "y": 170.0 }
+    "layers": {
+      "nodes": {
+        "label": "Nós",
+        "order": 2,
+        "data": [
+          {
+            "id": "node-101",
+            "label": "SW-Core-01",
+            "node_kind": "switch",
+            "x": 300.0,
+            "y": 220.0,
+            "lat": -23.55,
+            "lng": -46.63,
+            "icon": "switch",
+            "color": "#0b5d9b",
+            "metadata": {
+              "tier": "core",
+              "floor": 2,
+              "layer": "map-nodes"
+            },
+            "zabbix_ref": "10084",
+            "zabbix_status": "up",
+            "zabbix_host": {
+              "hostid": "10084",
+              "status": "enabled",
+              "interfaces": [
+                { "ip": "10.1.0.5", "type": "agent", "main": true }
+              ],
+              "inventory": { "vendor": "Juniper", "model": "MX480" },
+              "suggested_device_attributes": { "hostname": "edge-fw-01" }
+            },
+            "actions": [
+              {
+                "type": "open_zabbix_host",
+                "label": "Abrir host no Zabbix",
+                "template": "https://zabbix.example/zabbix.php?action=host.detail&hostid=%{hostid}"
+              }
+            ]
+          }
         ]
+      },
+      "cables": {
+        "label": "Cabos",
+        "order": 3,
+        "data": [
+          {
+            "id": "cable-501",
+            "label": "Uplink 10G",
+            "cable_type": "fiber",
+            "status": "up",
+            "zabbix_status": "up",
+            "points": [
+              { "position": 0, "x": 470.0, "y": 170.0 },
+              { "position": 1, "x": 620.0, "y": 170.0 }
+            ],
+            "metadata": {
+              "owner": "infra",
+              "path": "duct-core",
+              "criticality": "high"
+            }
+          }
+        ]
+      }
+    },
+    "filters": {
+      "node_kinds": ["switch", "firewall"],
+      "node_statuses": ["up"],
+      "cable_types": ["fiber"],
+      "actions": [
+        {
+          "type": "sync_connection",
+          "endpoint": "/api/v1/zabbix_connections/7"
+        }
+      ]
+    },
+    "zabbix_context": {
+      "connection": {
+        "id": 7,
+        "name": "Zabbix EU",
+        "connection_mode": "hybrid",
+        "last_synced_at": "2026-03-26T07:45:00Z",
+        "status": "active"
+      },
+      "hosts": [
+        {
+          "hostid": "10084",
+          "status": "enabled",
+          "availability": true,
+          "interfaces": [
+            { "ip": "10.1.0.5", "type": "agent", "main": true }
+          ],
+          "items_summary": [
+            { "itemid": "30001", "lastvalue": "0.15", "lastclock": "2026-03-26T07:43:00Z" }
+          ]
+        }
+      ],
+      "metrics": [
+        { "map_node_id": 101, "bindings_count": 2 }
+      ],
+      "sync": {
+        "last_synced_at": "2026-03-26T07:45:00Z",
+        "hosts_count": 1
+      },
+      "urls": {
+        "host_detail": "/api/v1/zabbix_connections/7/zabbix_hosts/%{hostid}"
+      }
+    }
+  }
+}
+```
+
+## 4) Devices e dashboard vinculados
+
+### Endpoints expostos
+
+- `GET /api/v1/devices` lista dispositivos com dados de inventário e link para Zabbix.
+- `GET /api/v1/devices/:id` retorna o registro completo de um dispositivo, interfaces coletadas do host vinculado e itens disponíveis.
+- `GET /api/v1/devices/:id/dashboard` resume o host do Zabbix e os itens vinculados à interface, incluindo os últimos valores coletados direto de `history_uint`.
+
+### `GET /api/v1/devices/:id`
+
+```json
+{
+  "data": {
+    "id": 5,
+    "name": "SWCX-001-001-005-CENTRAL",
+    "hostname": "SWCX-001-001-005-CENTRAL",
+    "role": "switch",
+    "management_ip": "10.1.1.5",
+    "status": "active",
+    "zabbix_connection_id": 3,
+    "zabbix_host_id": "10634",
+    "zabbix_host": {"hostid": "10634", "label": "SWCX-001-001-005-CENTRAL"},
+    "zabbix_interfaces": [
+      {"ip": "10.1.1.5", "dns": "", "type": "snmp", "main": true}
+    ],
+    "zabbix_items": [
+      {"value": "30001", "label": "ifOperStatus", "itemid": "30001", "key": "net.if.oper[1]"}
+    ]
+  }
+}
+```
+
+- `zabbix_interfaces` replica o `metadata.interfaces` trazido pelo link do host salvo em `zabbix_links`.
+- `zabbix_items` traz até 100 itens (por `Zabbix::ItemFinder`) com `label`, `key`, `itemid` e `value` (itemid por compatibilidade).
+
+### `GET /api/v1/devices/:id/dashboard`
+
+```json
+{
+  "data": {
+    "host": {"hostid": "10634", "name": "SWCX-001-001-005-CENTRAL", "status": "enabled", "available": true},
+    "items": [
+      {
+        "itemid": "30001",
+        "name": "ifInOctets",
+        "key": "net.if.in[1]",
+        "value_type": "3",
+        "units": "bps",
+        "status": "0",
+        "state": null,
+        "lastvalue": "0",
+        "lastclock": "1719999999",
+        "metadata": {},
+        "history": {"clock": "1719999999", "value": "0", "ns": "0"}
+      }
+    ],
+    "interface_items": [
+      {
+        "itemid": "30001",
+        "key": "net.if.in[1]"
       }
     ]
   }
 }
 ```
 
+- `items` lista todos os itens recuperados do host (direto do banco do Zabbix ou cache local) com atributos extras (`value_type`, `state`, `metadata`).
+- Para cada `item`, o `history` contém o último `clock`, `ns` e `value` vindos de `history_uint`, e `lastvalue`/`lastclock` seguem essa mesma leitura.
+- Cada `history` agora inclui `display_value`, `value_type`, `units` e `clock_iso` (ISO 8601) para que o frontend saiba como renderizar o número/string com unidade e hora legível esport.
+- Métricas de largura de banda (`bps`) recebem um `display_value` com escala SI (`Kbps`, `Mbps`, `Gbps`, etc.), e `system.uptime` é convertida em `Xd Yh Zm Ws` para facilitar a leitura.
+- Para throughput, geramos valores arredondados com até duas casas decimais (`6.15 Gbps`) e removemos zeros desnecessários, enquanto unidades não numéricas permanecem como estão.
+- `interface_items` é um subconjunto filtrado por chaves como `net.if` ou metadata com `SNMPINDEX`, útil para renderizar dashboards de interfaces.
+- Quando a conexão com o Zabbix não está ativa (sem `db_enabled?`), a rota retorna `{"host": null, "items": [], "interface_items": []}` para o frontend lidar com ausência de dados.
+
 ---
 
-## 4) Estratégia no frontend (React/Vue/Canvas/SVG)
+## 5) Estratégia no frontend (React/Vue/Canvas/SVG)
 
 ### SVG (recomendado para MVP)
 
@@ -130,7 +299,7 @@ No frontend, cada cabo é renderizado assim:
 
 ---
 
-## 5) Boas práticas de persistência
+## 6) Boas práticas de persistência
 
 - salvar coordenadas em decimal (já modelado) e manter precisão consistente;
 - normalizar ordenação de `network_cable_points` por `position`;

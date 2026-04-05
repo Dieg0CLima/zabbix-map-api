@@ -1,6 +1,6 @@
 class Api::V1::DevicesController < Api::V1::BaseController
   before_action :require_editor_or_admin!, only: %i[create update destroy site_link]
-  before_action :set_device, only: %i[show update destroy site_link]
+  before_action :set_device, only: %i[show dashboard update destroy site_link]
 
   def index
     devices = current_organization.devices.includes(:zabbix_host_link).order(:id)
@@ -18,6 +18,11 @@ class Api::V1::DevicesController < Api::V1::BaseController
 
   def show
     render_data(data: Api::V1::DeviceSerializer.new(@device).as_json)
+  end
+
+  def dashboard
+    payload = Devices::DashboardPayloadBuilder.new(device: @device, limit: dashboard_limit).call
+    render_data(data: payload)
   end
 
   def create
@@ -52,6 +57,12 @@ class Api::V1::DevicesController < Api::V1::BaseController
   end
 
   private
+
+  def dashboard_limit
+    limit = params[:limit] || params.dig(:dashboard, :limit)
+    return nil unless limit.present?
+    limit.to_i
+  end
 
   def set_device
     @device = find_record(current_organization.devices, params[:id])
