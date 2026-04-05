@@ -13,7 +13,7 @@ super_admin_email = ENV.fetch("DEFAULT_ADMIN_EMAIL", "admin@zabbix-map.local")
 super_admin_password = ENV["DEFAULT_ADMIN_PASSWORD"].presence || "ZbxMap!#{SecureRandom.alphanumeric(20)}"
 
 super_admin = User.find_or_initialize_by(email: super_admin_email)
-if super_admin.new_record?
+if super_admin.new_record? || ENV["DEFAULT_ADMIN_PASSWORD"].present?
   super_admin.password = super_admin_password
   super_admin.password_confirmation = super_admin_password
 end
@@ -25,7 +25,7 @@ org_admin_email = ENV.fetch("DEFAULT_ORG_ADMIN_EMAIL", "org-admin@zabbix-map.loc
 org_admin_password = ENV["DEFAULT_ORG_ADMIN_PASSWORD"].presence || "OrgAdmin!#{SecureRandom.alphanumeric(20)}"
 
 org_admin = User.find_or_initialize_by(email: org_admin_email)
-if org_admin.new_record?
+if org_admin.new_record? || ENV["DEFAULT_ORG_ADMIN_PASSWORD"].present?
   org_admin.password = org_admin_password
   org_admin.password_confirmation = org_admin_password
 end
