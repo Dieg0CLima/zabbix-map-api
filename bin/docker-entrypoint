@@ -17,7 +17,7 @@ is_truthy() {
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   if is_truthy "${DB_RESET:-}"; then
     echo "[DB_RESET] Dropping and recreating database..."
-    ./bin/rails db:drop db:create db:migrate
+    DISABLE_DATABASE_ENVIRONMENT_CHECK=1 ./bin/rails db:drop db:create db:migrate
   else
     ./bin/rails db:prepare
   fi
