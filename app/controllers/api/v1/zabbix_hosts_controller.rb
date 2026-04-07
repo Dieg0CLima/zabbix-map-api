@@ -26,6 +26,20 @@ class Api::V1::ZabbixHostsController < ApplicationController
     render_validation_error({ hostid: e.message }, message: "Host inválido")
   end
 
+  def items
+    result = ZabbixHosts::ItemsFetcher.new(
+      connection: @zabbix_connection,
+      hostid: params[:id],
+      limit: params[:limit]
+    ).call
+
+    render json: { data: result }, status: :ok
+  rescue Zabbix::DatabaseItemsFetcher::UnsupportedAdapterError => e
+    render_validation_error({ adapter: e.message }, message: "Unsupported adapter")
+  rescue Zabbix::DatabaseItemsFetcher::Error, ZabbixHosts::ItemsFetcher::Error => e
+    render_service_unavailable(message: "Unable to fetch items for host", details: e.message)
+  end
+
   def dropdown
     result = ZabbixConnections::HostDropdownFetcher.new(
       connection: @zabbix_connection,

@@ -49,6 +49,11 @@ Rails.application.routes.draw do
 
         resources :nodes, controller: "map_nodes_v2", only: %i[index create update destroy] do
           resources :monitoring_bindings, controller: "map_monitoring_bindings", only: %i[index create update destroy]
+          resources :node_items, controller: "map_node_items_v2", only: %i[index create destroy] do
+            collection do
+              get :metrics
+            end
+          end
         end
 
         member do
@@ -91,6 +96,9 @@ Rails.application.routes.draw do
         resources :zabbix_hosts, only: %i[index show] do
           collection do
             get :dropdown
+          end
+          member do
+            get :items
           end
         end
         resources :zabbix_items, only: :index do

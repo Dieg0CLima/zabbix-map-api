@@ -25,6 +25,7 @@ class MapNodeItems::PayloadBuilder
     {
       id: @zabbix_item.id,
       itemid: @zabbix_item.itemid,
+      hostid: @zabbix_item.host&.hostid,
       name: @zabbix_item.name,
       key_: @zabbix_item.key_,
       value_type: @zabbix_item.value_type,

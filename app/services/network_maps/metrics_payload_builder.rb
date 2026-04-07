@@ -14,20 +14,37 @@ class NetworkMaps::MetricsPayloadBuilder
   private
 
   def node_metrics
-    @network_map.map_nodes
-                .includes(:zabbix_host, map_node_items: :zabbix_item)
-                .order(:id)
-                .map { |node| build_node_metrics(node) }
+    nodes = @network_map.map_nodes
+                        .includes(:zabbix_host, map_node_items: :zabbix_item)
+                        .order(:id)
+    history = fetch_live_history(nodes)
+    nodes.map { |node| build_node_metrics(node, history) }
   end
 
-  def build_node_metrics(node)
+  def fetch_live_history(nodes)
+    return {} unless @network_map.zabbix_connection&.db_enabled?
+
+    itemids = nodes.flat_map do |node|
+      node.map_node_items.filter_map { |mni| mni.zabbix_item&.itemid }
+    end.uniq
+    return {} if itemids.empty?
+
+    Zabbix::HistoryFetcher.new(
+      connection: @network_map.zabbix_connection,
+      itemids: itemids
+    ).call
+  rescue StandardError
+    {}
+  end
+
+  def build_node_metrics(node, history = {})
     {
       id: node.external_id || node.id,
       external_id: node.external_id,
       label: node.label,
       node_kind: node.node_kind,
       zabbix_host: build_host_data(node.zabbix_host),
-      metrics: node.map_node_items.map { |mni| build_metric(mni) }
+      metrics: node.map_node_items.map { |mni| build_metric(mni, history) }
     }
   end
 
@@ -44,8 +61,9 @@ class NetworkMaps::MetricsPayloadBuilder
     }
   end
 
-  def build_metric(map_node_item)
+  def build_metric(map_node_item, history = {})
     item = map_node_item.zabbix_item
+    live = history[item.itemid.to_s] if item && history.any?
 
     {
       map_node_item_id: map_node_item.id,
@@ -58,8 +76,8 @@ class NetworkMaps::MetricsPayloadBuilder
       units: item.units,
       status: item.status,
       state: item.state,
-      lastvalue: item.lastvalue,
-      lastclock: item.lastclock
+      lastvalue: live&.dig("value") || item.lastvalue,
+      lastclock: live&.dig("clock") || item.lastclock
     }
   end
 end
