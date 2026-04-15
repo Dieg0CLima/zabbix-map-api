@@ -70,10 +70,48 @@ No frontend, cada cabo é renderizado assim:
 
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts`
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items`
+- `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts/:id/items`
 
 `zabbix_hosts` aceita parâmetro opcional `?limit=<n>` no modo de leitura direta no banco.
 
 `zabbix_items` aceita filtros opcionais: `?zabbix_host_id=<id>` (cache local), `?hostid=<id>` e `?limit=<n>` (leitura direta no banco).
+
+`zabbix_hosts/:id/items` compartilha o mesmo formato do endpoint genérico de itens e sempre contabiliza o host solicitado; o `meta` informa `connection_id`, `hostid`, `zabbix_host_id`, `limit`, `count` e `source` (`database` quando o `ZabbixConnection` consegue ler o banco diretamente, caso contrário `cache`).
+
+Além dos mesmos filtros de `zabbix_items`, também existe o endpoint `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items/history?itemid[]=...` que retorna apenas os valores mais recentes (`history`) dos `itemid`s explicitados. O contrato dessa rota é `{ "data": [history_entry,...], "meta": { "connection_id": ..., "count": ..., "source": ... } }` e os itens trazem `clock`, `ns`, `value`, `clock_iso`, `display_value`, `lastvalue`, `lastclock` e `lastns`. O frontend deve chamá-la somente para os “itens selecionados” (lista reduzida) para evitar leituras pesadas sobre as tabelas `history`/`history_uint`.
+
+Ambos `zabbix_items` e `zabbix_hosts/:id/items` retornam um envelope `{ "data": [ ... ], "meta": { ... } }` onde cada item do array inclui:
+```json
+{
+  "itemid": "30001",
+  "name": "ifInOctets",
+  "key": "net.if.in[1]",
+  "value_type": "3",
+  "units": "bps",
+  "status": "0",
+  "state": null,
+  "metadata": { ... },
+  "host": { "hostid": "10634", "name": "SWCX-001-001-005-CENTRAL" },
+  "lastvalue": "0",
+  "lastclock": "1719999999",
+  "history": {
+    "itemid": "30001",
+    "clock": "1719999999",
+    "ns": "0",
+    "value": "0",
+    "clock_iso": "2024-04-05T18:26:39Z",
+    "units": "bps",
+    "value_type": "3",
+    "display_value": "0 bps"
+  }
+}
+```
+
+- `lastvalue`/`lastclock`: refletem o último dado armazenado (cache) ou no histórico (Database) para o item consultado.
+- `history`: opcional quando o Zabbix oferece acesso ao banco; os campos `clock`, `ns`, `value`, `clock_iso` e `display_value` ajudam o frontend a renderizar métricas e aplicar formatação específica para throughput (`bps`) e uptime.
+- `metadata`: replica qualquer informação extra salva no cache local para uso da UI (ex: `SNMPINDEX`, `item.transport`).
+
+Quando nenhuma conexão consegue acessar o banco, o histórico é omitido, e o backend retorna apenas o que estiver disponível no cache `zabbix_items`. O front deve manter a mesma estrutura e confiar no `meta.source` para diferenciar entre leitura de banco (`database`) e cache (`cache`).
 
 ---
 

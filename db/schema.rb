@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_05_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_11_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -26,6 +26,33 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_05_120000) do
     t.datetime "updated_at", null: false
     t.index ["device_id", "name"], name: "index_device_interfaces_on_device_id_and_name", unique: true
     t.index ["device_id"], name: "index_device_interfaces_on_device_id"
+  end
+
+  create_table "device_monitoring_items", force: :cascade do |t|
+    t.bigint "device_monitoring_profile_id", null: false
+    t.bigint "zabbix_item_id", null: false
+    t.string "alias"
+    t.string "category"
+    t.string "subcategory"
+    t.string "usage", default: "map", null: false
+    t.integer "display_priority", default: 0, null: false
+    t.boolean "map_visibility", default: false, null: false
+    t.boolean "is_primary_metric", default: false, null: false
+    t.boolean "is_health_metric", default: false, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["device_monitoring_profile_id", "zabbix_item_id"], name: "index_device_monitoring_items_on_profile_and_item", unique: true
+    t.index ["device_monitoring_profile_id"], name: "index_device_monitoring_items_on_device_monitoring_profile_id"
+    t.index ["zabbix_item_id"], name: "index_device_monitoring_items_on_zabbix_item_id"
+  end
+
+  create_table "device_monitoring_profiles", force: :cascade do |t|
+    t.bigint "device_id", null: false
+    t.datetime "synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["device_id"], name: "index_device_monitoring_profiles_on_device_id"
   end
 
   create_table "devices", force: :cascade do |t|
@@ -454,6 +481,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_05_120000) do
   end
 
   add_foreign_key "device_interfaces", "devices"
+  add_foreign_key "device_monitoring_items", "device_monitoring_profiles"
+  add_foreign_key "device_monitoring_items", "zabbix_items"
+  add_foreign_key "device_monitoring_profiles", "devices"
   add_foreign_key "devices", "organizations"
   add_foreign_key "devices", "sites"
   add_foreign_key "devices", "zabbix_hosts", on_delete: :nullify

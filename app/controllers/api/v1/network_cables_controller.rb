@@ -5,7 +5,7 @@ class Api::V1::NetworkCablesController < ApplicationController
   before_action :authenticate_user!
   before_action :ensure_organization_access!
   before_action :set_network_map
-  before_action :set_network_cable, only: %i[show update destroy]
+  before_action :set_network_cable, only: %i[show update destroy available_device_items]
   before_action :require_editor_or_admin!, only: %i[create update destroy]
 
   def index
@@ -56,6 +56,11 @@ class Api::V1::NetworkCablesController < ApplicationController
     NetworkCables::Destroy.new(cable: @network_cable, network_map: @network_map, actor_email: current_user.email).call
 
     head :no_content
+  end
+
+  def available_device_items
+    result = NetworkCables::AvailableDeviceItemsQuery.new(cable: @network_cable).call
+    render json: { data: result }, status: :ok
   end
 
   private

@@ -32,6 +32,12 @@ Rails.application.routes.draw do
         end
         resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]
         resources :zabbix_links, controller: "zabbix_links", only: %i[index create]
+        namespace :monitoring, module: "devices/monitoring" do
+          resource :host_link, only: %i[show update], path: "host-link"
+          get "available-items", to: "available_items#index"
+          resources :items, only: %i[index create update destroy]
+          get "summary", to: "summary#show"
+        end
       end
       get "device_interfaces/:interface_id/zabbix_links", to: "zabbix_links#index"
       post "device_interfaces/:interface_id/zabbix_links", to: "zabbix_links#create"
@@ -61,6 +67,14 @@ Rails.application.routes.draw do
           post "nodes/from-device", to: "map_nodes_v2#from_device"
         end
 
+        resources :network_cables do
+          member do
+            get :available_device_items
+          end
+          resources :events, controller: "network_cable_events", only: :index
+          resources :network_cable_items, only: %i[index create destroy]
+        end
+
         resources :edges, controller: "map_edges", param: :id, only: %i[index create update destroy]
         resources :site_markers, controller: "site_markers", only: %i[create update destroy] do
           collection do
@@ -84,6 +98,9 @@ Rails.application.routes.draw do
           resources :map_node_items, only: %i[index create destroy]
         end
         resources :network_cables do
+          member do
+            get :available_device_items
+          end
           resources :events, controller: "network_cable_events", only: :index
           resources :network_cable_items, only: %i[index create destroy]
         end
@@ -104,6 +121,7 @@ Rails.application.routes.draw do
         resources :zabbix_items, only: :index do
           collection do
             get :dropdown
+            get :history
           end
         end
         member do

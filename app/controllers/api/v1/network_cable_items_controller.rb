@@ -9,17 +9,19 @@ class Api::V1::NetworkCableItemsController < ApplicationController
   before_action :require_editor_or_admin!, only: %i[create destroy]
 
   def index
-    items = @network_cable.network_cable_items.includes(:zabbix_item).order(:display_order, :id)
-    render json: { data: items.map { |i| NetworkCableItems::PayloadBuilder.new(network_cable_item: i).call } }, status: :ok
+    items       = @network_cable.network_cable_items.includes(zabbix_item: :zabbix_connection).order(:display_order, :id)
+    live_values = Zabbix::LiveValuesFetcher.new(items: items.filter_map(&:zabbix_item)).call
+    render json: { data: items.map { |i| NetworkCableItems::PayloadBuilder.new(network_cable_item: i, live_values: live_values).call } }, status: :ok
   end
 
   def create
-    item = NetworkCableItems::Create.new(
+    item        = NetworkCableItems::Create.new(
       network_cable: @network_cable,
-      payload: permitted_params.to_h.symbolize_keys
+      payload:       permitted_params.to_h.symbolize_keys
     ).call
+    live_values = Zabbix::LiveValuesFetcher.new(items: [ item.zabbix_item ].compact).call
 
-    render json: { data: NetworkCableItems::PayloadBuilder.new(network_cable_item: item).call }, status: :created
+    render json: { data: NetworkCableItems::PayloadBuilder.new(network_cable_item: item, live_values: live_values).call }, status: :created
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record)
   end

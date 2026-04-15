@@ -10,6 +10,7 @@ class Devices::CreateDevice
     ActiveRecord::Base.transaction do
       device = @organization.devices.create!(device_attributes)
       Devices::ZabbixHostLinkUpserter.new(device:, organization: @organization, params: @params).call
+      Devices::MonitoringProfileSync.new(device: device).call
       device.reload
       marker = attach_to_map(device) if add_to_map?
       [device, marker]

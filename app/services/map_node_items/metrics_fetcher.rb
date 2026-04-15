@@ -22,13 +22,17 @@ module MapNodeItems
     def fetch_live_history
       return {} unless network_map.zabbix_connection&.db_enabled?
 
-      itemids = items.filter_map { |i| i.zabbix_item&.itemid }
-      return {} if itemids.empty?
+      loaded = items.select { |i| i.zabbix_item.present? }
+      return {} if loaded.empty?
 
-      Zabbix::HistoryFetcher.new(
-        connection: network_map.zabbix_connection,
-        itemids: itemids
-      ).call
+      itemids        = loaded.map { |i| i.zabbix_item.itemid }
+      value_type_map = loaded.each_with_object({}) { |i, h| h[i.zabbix_item.itemid.to_s] = i.zabbix_item.value_type.to_s }
+
+      Zabbix::HistoryCache.new(
+        connection:     network_map.zabbix_connection,
+        itemids:        itemids,
+        value_type_map: value_type_map
+      ).fetch
     rescue StandardError
       {}
     end

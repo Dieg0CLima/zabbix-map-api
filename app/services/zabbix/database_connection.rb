@@ -47,7 +47,9 @@ module Zabbix
         port: @connection.db_port,
         dbname: @connection.db_name,
         user: @connection.db_username,
-        password: @connection.db_password
+        password: @connection.db_password,
+        connect_timeout: 5,
+        options: "-c statement_timeout=10000"  # 10s max per query
       }
     end
 
@@ -57,7 +59,10 @@ module Zabbix
         port: @connection.db_port,
         database: @connection.db_name,
         username: @connection.db_username,
-        password: @connection.db_password
+        password: @connection.db_password,
+        connect_timeout: 5,
+        read_timeout: 10,
+        write_timeout: 10
       }
     end
 

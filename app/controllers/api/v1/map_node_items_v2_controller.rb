@@ -6,8 +6,7 @@ class Api::V1::MapNodeItemsV2Controller < Api::V1::BaseController
 
   def index
     items = @map_node.map_node_items.includes(zabbix_item: :host).order(:display_order, :id)
-    history = fetch_live_history(items)
-    render_data(data: items.map { |i| build_payload(i, history) })
+    render_data(data: items.map { |i| MapNodeItems::PayloadBuilder.new(map_node_item: i).call })
   end
 
   def metrics
@@ -54,34 +53,6 @@ class Api::V1::MapNodeItemsV2Controller < Api::V1::BaseController
     @map_node_item = @map_node.map_node_items.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
-  end
-
-  def fetch_live_history(items)
-    return {} unless @network_map.zabbix_connection&.db_enabled?
-
-    itemids = items.filter_map { |i| i.zabbix_item&.itemid }
-    return {} if itemids.empty?
-
-    Zabbix::HistoryFetcher.new(
-      connection: @network_map.zabbix_connection,
-      itemids: itemids
-    ).call
-  rescue StandardError
-    {}
-  end
-
-  def build_payload(map_node_item, history)
-    base = MapNodeItems::PayloadBuilder.new(map_node_item: map_node_item).call
-    return base if history.empty? || map_node_item.zabbix_item.nil?
-
-    live = history[map_node_item.zabbix_item.itemid.to_s]
-    return base unless live
-
-    base[:zabbix_item] = base[:zabbix_item].merge(
-      lastvalue: live["value"],
-      lastclock: live["clock"]
-    )
-    base
   end
 
   def permitted_params

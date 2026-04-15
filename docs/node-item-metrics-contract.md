@@ -54,7 +54,7 @@ Campo-chave:
 
 ### Comportamento esperado
 - Retorna lista vazia se o nó não tiver `map_node_items` ou não houver `zabbix_item` associado (sem erro).
-- Usa `Zabbix::HistoryFetcher` para recuperar um único registro mais recente por `itemid` quando a conexão permite leitura direta (`db_enabled?`).
+- Usa `Zabbix::HistoryCache` (que delega ao `HistoryFetcher`) para recuperar o registro mais recente por `itemid` quando a conexão permite leitura direta (`db_enabled?`) e reduzir consultas repetidas.
 - Quando nenhum `history` está disponível, entrega os campos `lastvalue`/`lastclock` já preenchidos no banco local (`zabbix_items`).
 
 ### Sugestão de uso no frontend

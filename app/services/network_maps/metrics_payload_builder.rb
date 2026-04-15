@@ -22,17 +22,16 @@ class NetworkMaps::MetricsPayloadBuilder
   end
 
   def fetch_live_history(nodes)
-    return {} unless @network_map.zabbix_connection&.db_enabled?
+    connection = @network_map.zabbix_connection
+    return {} unless connection&.db_enabled?
 
-    itemids = nodes.flat_map do |node|
-      node.map_node_items.filter_map { |mni| mni.zabbix_item&.itemid }
-    end.uniq
-    return {} if itemids.empty?
+    loaded_items = nodes.flat_map { |node| node.map_node_items.select { |mni| mni.zabbix_item.present? } }
+    return {} if loaded_items.empty?
 
-    Zabbix::HistoryFetcher.new(
-      connection: @network_map.zabbix_connection,
-      itemids: itemids
-    ).call
+    itemids        = loaded_items.map { |mni| mni.zabbix_item.itemid }.uniq
+    value_type_map = loaded_items.each_with_object({}) { |mni, h| h[mni.zabbix_item.itemid.to_s] = mni.zabbix_item.value_type.to_s }
+
+    Zabbix::HistoryCache.new(connection: connection, itemids: itemids, value_type_map: value_type_map).fetch
   rescue StandardError
     {}
   end

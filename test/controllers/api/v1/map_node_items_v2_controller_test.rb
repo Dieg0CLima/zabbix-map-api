@@ -82,14 +82,16 @@ class Api::V1::MapNodeItemsV2ControllerTest < ActionDispatch::IntegrationTest
       "30001" => { "value" => "987654", "clock" => "1800000000" }
     }
 
-    fetcher = Minitest::Mock.new
-    fetcher.expect(:call, history_payload)
+    cache_stub = Minitest::Mock.new
+    cache_stub.expect(:fetch, history_payload)
 
-    Zabbix::HistoryFetcher.stub(:new, fetcher) do
+    stub_factory = ->(**kwargs) { cache_stub }
+
+    Zabbix::HistoryCache.stub(:new, stub_factory) do
       get "/api/v1/network_maps/#{@network_map.id}/nodes/#{@node.id}/node_items/metrics", headers: auth_headers, as: :json
     end
 
-    fetcher.verify
+    cache_stub.verify
 
     assert_response :ok
     body = JSON.parse(response.body)

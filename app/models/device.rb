@@ -14,6 +14,8 @@ class Device < ApplicationRecord
           class_name: "ZabbixLink",
           inverse_of: :linkable
   has_one :zabbix_connection, through: :zabbix_host_link
+  has_one :monitoring_profile, class_name: "DeviceMonitoringProfile", dependent: :destroy
+  has_many :monitoring_items, through: :monitoring_profile, source: :device_monitoring_items
 
   validates :name, presence: true
   validates :role, presence: true, inclusion: { in: ROLES }
