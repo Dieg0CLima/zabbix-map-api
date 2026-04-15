@@ -56,7 +56,18 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/network_maps/:network_map_id/network_cables/:id`
 - `POST /api/v1/network_maps/:network_map_id/network_cables`
 - `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id`
+- `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id/geometry`
 - `DELETE /api/v1/network_maps/:network_map_id/network_cables/:id`
+
+`PATCH .../geometry` aplica operações incrementais de edição de rota, sem sobrescrever todo o recurso de cabo:
+
+- `operation: "move_point"` requer `position` e `point` (`lat/lng` ou `x/y`).
+- `operation: "remove_segment"` requer `from_position` e `to_position`.
+- `operation: "insert_point"` requer `after_position` e `points`.
+- `operation: "remove_point"` requer `position`.
+- `operation: "replace_all"` requer `points`.
+
+Opcionalmente, envie `geometry_version` para controle de concorrência otimista. Em caso de conflito, a API retorna `409` com código `geometry_conflict` e os campos `expected_version` e `current_version`.
 
 ### Conexões Zabbix
 

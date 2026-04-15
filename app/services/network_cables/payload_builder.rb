@@ -22,6 +22,7 @@ class NetworkCables::PayloadBuilder
       pattern: @cable.pattern,
       bandwidth_mbps: @cable.bandwidth_mbps,
       length_meters: @cable.length_meters,
+      geometry_version: @cable.metadata&.[]("geometry_version").to_i,
       metadata: @cable.metadata,
       points: ordered_points
     }

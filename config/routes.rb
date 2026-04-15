@@ -70,6 +70,7 @@ Rails.application.routes.draw do
         resources :network_cables do
           member do
             get :available_device_items
+            patch :geometry
           end
           resources :events, controller: "network_cable_events", only: :index
           resources :network_cable_items, only: %i[index create destroy]
@@ -100,6 +101,7 @@ Rails.application.routes.draw do
         resources :network_cables do
           member do
             get :available_device_items
+            patch :geometry
           end
           resources :events, controller: "network_cable_events", only: :index
           resources :network_cable_items, only: %i[index create destroy]
