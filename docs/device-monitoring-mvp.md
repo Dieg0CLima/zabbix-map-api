@@ -15,13 +15,13 @@
 ## Fluxo de dados MVP
 1. O cadastro/edição do device continua chamando `Devices::ZabbixHostLinkUpserter`.
 2. Logo após, um novo `Devices::MonitoringProfileSync` garante que o `DeviceMonitoringProfile` existe e reflete o `zabbix_host_link` atual; quando o host for removido, o profile é destruído.
-3. O frontend chama `GET /api/v1/devices/:id/monitoring/available-items` para obter o catálogo (sem telemetria).
+3. O frontend chama `GET /api/v1/devices/:id/monitoring/available-items` para obter o catálogo (sem telemetria), com paginação e busca por `q`.
 4. Para salvar um item, o frontend POSTa em `/devices/:id/monitoring/items` informando `zabbix_item_id`, categoria, uso e alias; o backend cria `DeviceMonitoringItem` e aplica heurísticas simples de categoria via `key`/`units`.
 5. A listagem `/monitoring/items` separa claramente itens escolhidos (metadados + flags), enquanto `/monitoring/summary` agrega os principais indicadores por categoria usando `is_primary_metric` e `is_health_metric`.
 
 ## API MVP proposta
 - `PUT /api/v1/devices/:id/monitoring/host-link` → cria/atualiza profile (aproveitando `Devices::MonitoringProfileSync`).
-- `GET /api/v1/devices/:id/monitoring/available-items` → retorna atributos leves de `Zabbix::Item` + `category_hint`, `suggested_alias`.
+- `GET /api/v1/devices/:id/monitoring/available-items` → retorna atributos leves de `Zabbix::Item` + `category_hint`, `suggested_alias`, com `page`, `per_page`, `q` e meta paginada (`total_count`, `total_pages`, `has_next_page`, `has_prev_page`).
 - `POST /api/v1/devices/:id/monitoring/items` → cria seleção funcional (alias, category, usage, map_visibility).
 - `GET /api/v1/devices/:id/monitoring/items` → lista itens monitorados com classification e status.
 - `PATCH /api/v1/devices/:id/monitoring/items/:id` → atualiza alias, uso, prioridade, flags.
@@ -30,7 +30,7 @@
 
 ### Exemplos de respostas imediatas
 - `PUT /devices/:id/monitoring/host-link` retorna o profile com `zabbix_connection_id`, `zabbix_hostid`, `host_label` e `metadata` indicando `synced_at`.
-- `GET /devices/:id/monitoring/available-items` retorna `item_id`, `label`, `key`, `units`, `category_hint`, `map_visibility` sugerida e `metadata` básico (sem history).
+- `GET /devices/:id/monitoring/available-items` retorna `item_id`, `label`, `key`, `units`, `category_hint`, `map_visibility` sugerida, `metadata` básico (sem history) e meta paginada com suporte a busca (`q`).
 - `GET /devices/:id/monitoring/items` retorna cada seleção com `category`, `usage`, `map_visibility`, `is_primary_metric`, `is_health_metric`, `display_priority` e dados do `zabbix_item` (lastvalue/lastclock).
 - `GET /devices/:id/monitoring/summary` replica `category` + `usage` + `last_value` + `units` para os itens marcados como métricas principais/health.
 
