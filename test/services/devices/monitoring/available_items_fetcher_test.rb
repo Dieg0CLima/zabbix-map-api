@@ -32,6 +32,9 @@ class Devices::Monitoring::AvailableItemsFetcherTest < ActiveSupport::TestCase
 
     assert_empty result[:items]
     assert_equal 0, result[:meta][:count]
+    assert_equal 0, result[:meta][:total_count]
+    assert_equal 1, result[:meta][:page]
+    assert_equal 200, result[:meta][:per_page]
     assert_nil result[:meta][:source]
   end
 
@@ -59,6 +62,42 @@ class Devices::Monitoring::AvailableItemsFetcherTest < ActiveSupport::TestCase
       assert_equal "host-42", meta[:hostid]
       assert_equal "upserted", meta[:source]
       assert_equal 2, meta[:count]
+      assert_equal 2, meta[:total_count]
+      assert_equal 1, meta[:page]
+      assert_equal 5, meta[:per_page]
+      assert_equal false, meta[:has_next_page]
+    end
+  end
+
+  test "supports pagination and query filtering" do
+    raw_items = [
+      { itemid: "100", name: "CPU load", key: "system.cpu.load", units: "%", value_type: "3", value: 1 },
+      { itemid: "200", name: "Traffic In", key: "net.if.in", units: "bps", value_type: "3", value: 2 },
+      { itemid: "300", name: "Traffic Out", key: "net.if.out", units: "bps", value_type: "3", value: 3 },
+      { itemid: "400", name: "Errors", key: "net.if.errors", units: "pps", value_type: "3", value: 4 }
+    ]
+
+    fetcher_stub = Object.new
+    fetcher_stub.define_singleton_method(:call) { raw_items }
+
+    ZabbixHosts::ItemsFetcher.stub(:new, ->(**_) { fetcher_stub }) do
+      result = Devices::Monitoring::AvailableItemsFetcher.new(
+        profile: @profile,
+        page: 2,
+        per_page: 1,
+        query: "traffic"
+      ).call
+
+      assert_equal 1, result[:items].size
+      assert_equal "Traffic Out", result[:items].first[:label]
+      assert_equal 1, result[:meta][:count]
+      assert_equal 2, result[:meta][:total_count]
+      assert_equal 2, result[:meta][:page]
+      assert_equal 1, result[:meta][:per_page]
+      assert_equal 2, result[:meta][:total_pages]
+      assert_equal false, result[:meta][:has_next_page]
+      assert_equal true, result[:meta][:has_prev_page]
+      assert_equal "traffic", result[:meta][:query]
     end
   end
 
