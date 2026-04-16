@@ -1,5 +1,13 @@
 class NetworkCableItem < ApplicationRecord
-  METRIC_ROLES = %w[bandwidth_in bandwidth_out status].freeze
+  METRIC_ROLES = %w[
+    bandwidth_in
+    bandwidth_out
+    status
+    error_in
+    error_out
+    crc_in
+    crc_out
+  ].freeze
 
   belongs_to :network_cable
   belongs_to :zabbix_item, class_name: "Zabbix::Item"

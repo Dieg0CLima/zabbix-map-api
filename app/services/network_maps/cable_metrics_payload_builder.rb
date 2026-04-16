@@ -24,12 +24,36 @@ class NetworkMaps::CableMetricsPayloadBuilder
   end
 
   def build_cable_metrics(cable)
+    zabbix_status = derive_zabbix_status(cable)
+    operational = NetworkCables::OperationalStateBuilder.new(
+      cable: cable,
+      live_values: @live_values,
+      zabbix_status: zabbix_status
+    ).call
+
     {
       id: cable.id,
       external_id: cable.external_id,
       label: cable.label,
       status: cable.status,
-      zabbix_status: derive_zabbix_status(cable),
+      zabbix_status: zabbix_status,
+      operational_state: operational[:operational_state],
+      traffic_level: operational[:traffic_level],
+      alert_level: operational[:alert_level],
+      operational_details: {
+        upload_bps: operational[:upload_bps],
+        download_bps: operational[:download_bps],
+        upload_utilization_pct: operational[:upload_utilization_pct],
+        download_utilization_pct: operational[:download_utilization_pct],
+        max_utilization_pct: operational[:max_utilization_pct],
+        capacity_mbps: operational[:capacity_mbps],
+        error_in: operational[:error_in],
+        error_out: operational[:error_out],
+        crc_in: operational[:crc_in],
+        crc_out: operational[:crc_out],
+        lastclock: operational[:lastclock],
+        thresholds: operational[:thresholds]
+      },
       items: cable.network_cable_items.map { |ci| build_item(ci) }
     }
   end
@@ -51,7 +75,7 @@ class NetworkMaps::CableMetricsPayloadBuilder
 
   def build_item(cable_item)
     zabbix_item = cable_item.zabbix_item
-    live        = zabbix_item ? (@live_values || {})[ zabbix_item.itemid.to_s ] : nil
+    live        = zabbix_item ? (@live_values || {})[zabbix_item.itemid.to_s] : nil
 
     {
       id:               cable_item.id,

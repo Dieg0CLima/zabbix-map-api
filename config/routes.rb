@@ -51,6 +51,7 @@ Rails.application.routes.draw do
           get :health
           get :metrics
           get :events
+          get :cable_metrics
         end
 
         resources :nodes, controller: "map_nodes_v2", only: %i[index create update destroy] do

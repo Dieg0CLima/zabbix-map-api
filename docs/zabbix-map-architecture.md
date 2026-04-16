@@ -66,6 +66,11 @@ A modelagem para representar cabos e linhas entre equipamentos deve seguir este 
   - representa a conexão entre dois nós (`source_node` e `target_node`);
   - guarda tipo (`copper`, `fiber`, `wireless`, `logical`), status (`up/down/degraded/unknown`), capacidade e metadados.
 
+- `NetworkCableItem`
+  - vincula itens Zabbix ao cabo para leitura operacional do enlace;
+  - papéis suportados: `bandwidth_in`, `bandwidth_out`, `status`, `error_in`, `error_out`, `crc_in`, `crc_out`;
+  - base para classificação operacional de tráfego (`low/moderate/high/saturation`), detecção de `port_down` e alerta físico (`physical_alert`).
+
 - `NetworkCablePoint`
   - define os pontos intermediários da linha (polyline), permitindo desenhar curvas/quebras de cabo no mapa;
   - ordenado por `position`.

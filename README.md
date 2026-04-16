@@ -17,6 +17,7 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 - Namespace de API versionada em `/api/v1`;
 - Modelagem inicial para mapas de rede com nós, cabos e pontos de linha.
 - Suporte a múltiplas conexões Zabbix (API e banco direto) por organização.
+- Monitoramento operacional de cabos via `NetworkCableItem` (tráfego/status/erro/CRC) com payload realtime de classificação de enlace (`operational_state`, `traffic_level`, `alert_level`).
 
 ## Como subir o projeto
 

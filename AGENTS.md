@@ -130,6 +130,15 @@ item.lastclock   # ❌ stale
 - Already used in: `NetworkCableItems::PayloadBuilder`, `NetworkCableItemsController`, `Devices::Monitoring::ItemsController`, `NetworkMaps::CableMetricsPayloadBuilder`
 - Every new endpoint or serializer that exposes Zabbix metric values **must** go through this service
 
+## Cable Operational Monitoring (Current)
+
+- `NetworkCableItem` supports operational roles: `bandwidth_in`, `bandwidth_out`, `status`, `error_in`, `error_out`, `crc_in`, `crc_out`.
+- Realtime payload (`NetworkMaps::CableMetricsPayloadBuilder` / `MapChannel`) now includes derived operational fields:
+  - `operational_state`, `traffic_level`, `alert_level`
+  - `operational_details` (upload/download bps, utilization %, capacity, error/crc counters, thresholds, lastclock)
+- Default utilization thresholds are `50/80/95` and can be overridden per cable in `network_cables.metadata.operational_thresholds`.
+- Classification is cable-type agnostic (works for `fiber` and any other `cable_type`), but still respects existing `zabbix_status` derivation from the `status` metric.
+
 ## Regression & Scope Guards
 - Leave `legacy_network_maps`/`legacy` cables intact unless tests/docs cover the legacy surface too.
 - Touch `../zabbix-map-front` only when API contracts or UI behavior change.
