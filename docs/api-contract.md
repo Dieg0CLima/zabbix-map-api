@@ -41,6 +41,9 @@ No frontend, cada cabo é renderizado assim:
 - `POST /api/v1/network_maps`
 - `PATCH /api/v1/network_maps/:id`
 - `DELETE /api/v1/network_maps/:id`
+- `GET /api/v1/network_maps/:id/metrics`
+- `GET /api/v1/network_maps/:id/events`
+- `GET /api/v1/network_maps/:id/cable_metrics`
 
 ### Nós (por mapa)
 
@@ -68,6 +71,75 @@ No frontend, cada cabo é renderizado assim:
 - `operation: "replace_all"` requer `points`.
 
 Opcionalmente, envie `geometry_version` para controle de concorrência otimista. Em caso de conflito, a API retorna `409` com código `geometry_conflict` e os campos `expected_version` e `current_version`.
+
+#### Monitoramento operacional de cabos (realtime + inspeção)
+
+O monitoramento de cabos continua baseado em `NetworkCableItem`, agora com papéis expandidos para interpretação operacional do enlace:
+
+- `bandwidth_in`
+- `bandwidth_out`
+- `status`
+- `error_in`
+- `error_out`
+- `crc_in`
+- `crc_out`
+
+`GET /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/available_device_items` continua retornando itens por lado (`source`/`target`), mas a sugestão de papel agora considera também erro/CRC quando a classificação do item permitir inferência de direção.
+
+No payload de `cable_metrics` (via `MapChannel` em `initial` e `refresh`), cada cabo agora inclui camada operacional derivada:
+
+```json
+{
+  "id": 12,
+  "external_id": "cable-a",
+  "label": "Backbone",
+  "status": "active",
+  "zabbix_status": "up",
+  "operational_state": "traffic_high",
+  "traffic_level": "high",
+  "alert_level": "warning",
+  "operational_details": {
+    "upload_bps": 22000000.0,
+    "download_bps": 81000000.0,
+    "upload_utilization_pct": 22.0,
+    "download_utilization_pct": 81.0,
+    "max_utilization_pct": 81.0,
+    "capacity_mbps": 100,
+    "error_in": 0.0,
+    "error_out": 0.0,
+    "crc_in": 0.0,
+    "crc_out": 0.0,
+    "lastclock": "1712345678",
+    "thresholds": {
+      "low_pct": 50.0,
+      "moderate_pct": 80.0,
+      "high_pct": 95.0
+    }
+  },
+  "items": []
+}
+```
+
+Regras de estado operacional atuais:
+
+- `port_down`: item de `status` indica porta down (`2`/`down`);
+- `physical_alert`: porta não down com erro/CRC positivo;
+- `up_no_traffic`: porta up com tráfego nulo/ausente;
+- `no_traffic`: tráfego nulo sem confirmação explícita de porta up;
+- `traffic_low|traffic_moderate|traffic_high|saturation`: por ocupação da capacidade (`bandwidth_mbps`);
+- `unknown`: sem sinal suficiente para classificar.
+
+Thresholds padrão: `50/80/95` (baixo/moderado/alto), com override opcional em `network_cables.metadata.operational_thresholds`:
+
+```json
+{
+  "operational_thresholds": {
+    "low_pct": 50,
+    "moderate_pct": 80,
+    "high_pct": 95
+  }
+}
+```
 
 ### Conexões Zabbix
 

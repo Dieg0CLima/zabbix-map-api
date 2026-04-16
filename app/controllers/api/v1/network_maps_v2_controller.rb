@@ -1,6 +1,6 @@
 class Api::V1::NetworkMapsV2Controller < Api::V1::BaseController
   before_action :require_editor_or_admin!, only: %i[create update destroy]
-  before_action :set_network_map, only: %i[show update destroy health metrics events editor_state available_sites available_devices]
+  before_action :set_network_map, only: %i[show update destroy health metrics events cable_metrics editor_state available_sites available_devices]
 
   def index
     render_data(data: current_organization.network_maps.order(:id).map { |map| Api::V1::NetworkMapSerializer.new(map).as_json })
@@ -58,6 +58,10 @@ class Api::V1::NetworkMapsV2Controller < Api::V1::BaseController
 
   def events
     render_data(data: Zabbix::ProblemFetcher.new(network_map: @network_map).call)
+  end
+
+  def cable_metrics
+    render_data(data: NetworkMaps::CableMetricsPayloadBuilder.new(network_map: @network_map).call)
   end
 
   private

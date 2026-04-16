@@ -12,11 +12,13 @@ class MapMetricsBroadcastJob < ApplicationJob
     return unless network_map
 
     metrics = NetworkMaps::MetricsPayloadBuilder.new(network_map: network_map).call
+    cable_metrics = NetworkMaps::CableMetricsPayloadBuilder.new(network_map: network_map).call
     events  = NetworkMaps::RecentEventsPayloadBuilder.new(network_map: network_map).call
 
     MapChannel.broadcast_to(network_map, {
       type: "broadcast",
       metrics: metrics,
+      cable_metrics: cable_metrics,
       events: events
     })
   end
