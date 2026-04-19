@@ -40,6 +40,23 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
     assert_equal "SWCX-001-001-005-CENTRAL", result.first[:label]
   end
 
+  test "excludes hosts with status 3 from persisted dropdown" do
+    organization = Organization.create!(name: "Org Dropdown Persisted Status Filter")
+    connection = organization.zabbix_connections.create!(
+      name: "Conn API Status Filter",
+      status: "active",
+      connection_mode: "api",
+      base_url: "https://zabbix.local"
+    )
+
+    connection.zabbix_hosts.create!(hostid: "10100", name: "HOST-ENABLED", status: "0", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10101", name: "HOST-HIDDEN", status: "3", available: "1")
+
+    result = ZabbixConnections::HostDropdownFetcher.new(connection: connection).call
+
+    assert_equal ["HOST-ENABLED"], result.map { |row| row[:label] }
+  end
+
   test "returns hosts from database fetcher in database mode" do
     organization = Organization.create!(name: "Org Dropdown DB")
     connection = organization.zabbix_connections.create!(
@@ -55,6 +72,7 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
 
     mock_fetcher = Minitest::Mock.new
     mock_fetcher.expect(:call, [
+      { hostid: "30", name: "Template-Should-Hide", host: "template-hide", status: "3" },
       { hostid: "20", name: "Switch-1", host: "switch-1", status: "1" },
       { hostid: "10", name: "Router-1", host: "router-1", status: "0" }
     ])

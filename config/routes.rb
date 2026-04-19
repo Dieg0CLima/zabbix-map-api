@@ -92,6 +92,12 @@ Rails.application.routes.draw do
             delete :bulk_destroy
           end
         end
+
+        resources :sites, only: [] do
+          namespace :monitoring, module: "sites/monitoring" do
+            resource :ping_link, only: %i[show create destroy], path: "ping-link"
+          end
+        end
       end
 
       resources :legacy_network_maps, controller: "network_maps", path: "legacy/network_maps" do

@@ -12,7 +12,7 @@ Arquivos:
 ## Mapas e topologia
 - `NetworkMap` pertence a `Organization`.
 - `source_type` permitido: `manual|zabbix|hybrid`.
-- `active_base_layer` permitido: `standard|terrain|dark`.
+- `active_base_layer` permitido: `standard|terrain|hot|cycle|light|voyager|dark|satellite|streets|topo`.
 
 Arquivo: `app/models/network_map.rb`
 
@@ -47,4 +47,3 @@ Arquivo:
 
 ## Pontos com validacao pendente
 - `Precisa de validacao`: regras completas para `users.admin` sem membership em todos endpoints (implementacao varia por controller/scope).
-

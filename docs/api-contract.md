@@ -45,6 +45,9 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/network_maps/:id/events`
 - `GET /api/v1/network_maps/:id/cable_metrics`
 
+`active_base_layer` é o layer padrão persistido do mapa e aceita:
+`standard`, `terrain`, `hot`, `cycle`, `light`, `voyager`, `dark`, `satellite`, `streets`, `topo`.
+
 ### Nós (por mapa)
 
 - `GET /api/v1/network_maps/:network_map_id/map_nodes`
@@ -52,6 +55,45 @@ No frontend, cada cabo é renderizado assim:
 - `POST /api/v1/network_maps/:network_map_id/map_nodes`
 - `PATCH /api/v1/network_maps/:network_map_id/map_nodes/:id`
 - `DELETE /api/v1/network_maps/:network_map_id/map_nodes/:id`
+
+### Monitoramento de Site (ICMP)
+
+- `GET /api/v1/network_maps/:network_map_id/sites/:site_id/monitoring/ping-link`
+- `POST /api/v1/network_maps/:network_map_id/sites/:site_id/monitoring/ping-link`
+- `DELETE /api/v1/network_maps/:network_map_id/sites/:site_id/monitoring/ping-link`
+
+Objetivo: vincular itens ICMP de um dispositivo do `site` ao nó do site no mapa (`map_node_items`) para monitoramento operacional.
+
+Regras:
+
+- o `site` precisa estar anexado ao mapa (`map_node` com `mappable_type = "Site"`);
+- o `device_id` informado precisa pertencer ao `site`;
+- o item selecionado precisa ser ICMP (`key_`/`name` compatível com `icmpping`, `icmppingloss` ou `icmppingsec`);
+- se o mapa tiver `zabbix_connection_id`, o item precisa pertencer à mesma conexão;
+- ao criar, apenas o link ICMP do mesmo tipo é substituído (ex.: novo `icmppingloss` substitui somente o `icmppingloss` anterior), permitindo coexistência de `Ping`, `Loss` e `Response Time`.
+
+Payload de criação (`POST`):
+
+```json
+{
+  "monitoring_ping_link": {
+    "device_id": 15,
+    "zabbix_item_id": 991,
+    "alias": "ICMP Ping"
+  }
+}
+```
+
+Comportamento visual no `editor_state`:
+
+- quando o `site` tiver item ICMP vinculado e o valor mais recente indicar disponibilidade (`1`, `up`, `true`, `ok`, etc.), o elemento do site volta com `color_override` forçado para `#00c853` (destaque visual de site online);
+- o payload de cada `element` de site inclui `monitoring_ping.status` com `up`, `down` ou `unknown`, usando regra consolidada:
+  - `icmpping <= 0` => `down`
+  - `icmpping > 0` e `icmppingloss >= 100` => `down`
+  - `icmpping > 0` => `up`
+  - sem ping disponível => `unknown`
+- `monitoring_ping` inclui trilha de diagnóstico (`reason`, `decision_rule`, métrica primária e `metrics.ping/loss/response_time` com `lastvalue`, `lastclock`, `lastns`, `lastclock_iso`, `data_source`);
+- quando não houver vínculo ICMP, a cor segue `color_override` configurada no próprio marker.
 
 ### Cabos (por mapa)
 
@@ -131,6 +173,8 @@ Regras de estado operacional atuais:
 
 Thresholds padrão: `50/80/95` (baixo/moderado/alto), com override opcional em `network_cables.metadata.operational_thresholds`:
 
+`zabbix_status` no payload de cabo pode ser `up`, `down`, `degraded` ou `unknown` (com fallback para `null` quando não houver item de status associado).
+
 ```json
 {
   "operational_thresholds": {
@@ -152,10 +196,12 @@ Thresholds padrão: `50/80/95` (baixo/moderado/alto), com override opcional em `
 ### Dados sincronizados do Zabbix
 
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts`
+- `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts/dropdown`
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items`
 - `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts/:id/items`
 
 `zabbix_hosts` aceita parâmetro opcional `?limit=<n>` no modo de leitura direta no banco.
+`zabbix_hosts/dropdown` aceita `?q=<texto>` e `?limit=<n>`, e exclui hosts com `status = 3`.
 
 `zabbix_items` aceita filtros opcionais: `?zabbix_host_id=<id>` (cache local), `?hostid=<id>` e `?limit=<n>` (leitura direta no banco).
 

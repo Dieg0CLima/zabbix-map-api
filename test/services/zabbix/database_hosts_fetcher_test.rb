@@ -60,6 +60,13 @@ class Zabbix::DatabaseHostsFetcherTest < ActiveSupport::TestCase
     fake_database_connection.verify
   end
 
+  test "sql queries exclude hosts with status 3" do
+    fetcher = Zabbix::DatabaseHostsFetcher.new(connection: build_connection)
+
+    assert_includes fetcher.send(:postgresql_sql), "h.status <> 3"
+    assert_includes fetcher.send(:mysql_sql), "h.status <> 3"
+  end
+
   private
 
   def build_connection(db_adapter: "postgresql")
