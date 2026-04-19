@@ -25,4 +25,96 @@ class Api::V1::NetworkMapEditorStateV2ControllerTest < ActionDispatch::Integrati
     assert_equal 1, body.dig("data", "devices").size
     assert_equal 1, body.dig("data", "sites").size
   end
+
+  test "editor_state highlights site color when icmp ping is up" do
+    zabbix_connection = ZabbixConnection.create!(
+      organization: @organization,
+      name: "Conn Ping",
+      status: "active",
+      connection_mode: "api",
+      base_url: "https://zabbix.local"
+    )
+
+    host = zabbix_connection.zabbix_hosts.create!(
+      hostid: "10001",
+      name: "Site A Host"
+    )
+
+    ping_item = zabbix_connection.zabbix_items.create!(
+      itemid: "20001",
+      host: host,
+      name: "ICMP Ping",
+      key_: "icmpping",
+      value_type: "3",
+      units: "",
+      status: "0",
+      state: "0",
+      lastvalue: "1",
+      lastclock: "1700000000"
+    )
+
+    site_node = @network_map.map_nodes.find_by!(mappable: @site)
+    site_node.map_node_items.create!(zabbix_item: ping_item, alias: "ICMP Ping", display_order: 0)
+
+    get "/api/v1/network_maps/#{@network_map.id}/editor_state", params: { organization_id: @organization.id }, headers: @auth_headers
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "#00c853", body.dig("data", "elements", 0, "color_override")
+    assert_equal "up", body.dig("data", "elements", 0, "monitoring_ping", "status")
+  end
+
+  test "editor_state marks site down when ping is up but loss is 100 percent" do
+    zabbix_connection = ZabbixConnection.create!(
+      organization: @organization,
+      name: "Conn Ping Loss",
+      status: "active",
+      connection_mode: "api",
+      base_url: "https://zabbix.local"
+    )
+
+    host = zabbix_connection.zabbix_hosts.create!(
+      hostid: "10011",
+      name: "Site A Host"
+    )
+
+    ping_item = zabbix_connection.zabbix_items.create!(
+      itemid: "21001",
+      host: host,
+      name: "ICMP Ping",
+      key_: "icmpping",
+      value_type: "3",
+      units: "",
+      status: "0",
+      state: "0",
+      lastvalue: "1",
+      lastclock: "1700000010"
+    )
+
+    loss_item = zabbix_connection.zabbix_items.create!(
+      itemid: "21002",
+      host: host,
+      name: "ICMP loss",
+      key_: "icmppingloss",
+      value_type: "3",
+      units: "%",
+      status: "0",
+      state: "0",
+      lastvalue: "100",
+      lastclock: "1700000010"
+    )
+
+    site_node = @network_map.map_nodes.find_by!(mappable: @site)
+    site_node.map_node_items.create!(zabbix_item: ping_item, alias: "ICMP Ping", display_order: 0)
+    site_node.map_node_items.create!(zabbix_item: loss_item, alias: "ICMP Loss", display_order: 1)
+
+    get "/api/v1/network_maps/#{@network_map.id}/editor_state", params: { organization_id: @organization.id }, headers: @auth_headers
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "down", body.dig("data", "elements", 0, "monitoring_ping", "status")
+    assert_equal "loss_100", body.dig("data", "elements", 0, "monitoring_ping", "reason")
+    assert_equal "1", body.dig("data", "elements", 0, "monitoring_ping", "metrics", "ping", "lastvalue")
+    assert_equal "100", body.dig("data", "elements", 0, "monitoring_ping", "metrics", "loss", "lastvalue")
+  end
 end

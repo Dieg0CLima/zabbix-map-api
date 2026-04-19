@@ -65,12 +65,15 @@ class NetworkMaps::CableMetricsPayloadBuilder
     zi    = status_item.zabbix_item
     live  = (@live_values || {})[zi.itemid.to_s]
     value = (live&.dig("value") || zi.lastvalue).to_s.strip.downcase
+    return nil if value.blank?
 
-    # ifOperStatus: 1=up, 2=down; or textual "up"/"down"
-    return "up"   if value == "1" || value == "up"
-    return "down" if value == "2" || value == "down"
+    # ifOperStatus: 1=up, 2=down, 3=testing, 4=unknown, 5=dormant, 6=notPresent, 7=lowerLayerDown.
+    return "up" if %w[1 up].include?(value)
+    return "down" if %w[2 down].include?(value)
+    return "degraded" if %w[3 5 7 testing dormant lowerlayerdown lower_layer_down].include?(value)
+    return "unknown" if %w[4 6 unknown notpresent not_present unavailable].include?(value)
 
-    nil
+    "unknown"
   end
 
   def build_item(cable_item)

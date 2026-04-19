@@ -1,6 +1,7 @@
 class ZabbixConnections::HostDropdownFetcher
   DEFAULT_LIMIT = 5_000
   MAX_LIMIT = 10_000
+  EXCLUDED_STATUSES = %w[3].freeze
 
   class Error < StandardError; end
   class UnsupportedAdapterError < Error; end
@@ -20,7 +21,9 @@ class ZabbixConnections::HostDropdownFetcher
   def dropdown_hosts
     return persisted_dropdown_hosts unless @connection.db_enabled?
 
-    fetched_hosts.map do |host|
+    fetched_hosts.filter_map do |host|
+      next if excluded_status?(host[:status])
+
       transient_host = Struct.new(:hostid, :name, :status, :available, :interfaces, :metadata, keyword_init: true).new(
         hostid: host[:hostid],
         name: host[:name],
@@ -35,6 +38,7 @@ class ZabbixConnections::HostDropdownFetcher
 
   def persisted_dropdown_hosts
     scope = @connection.zabbix_hosts
+    scope = scope.where.not(status: EXCLUDED_STATUSES)
     scope = scope.where("name ILIKE :q OR hostid ILIKE :q", q: "%#{@query}%") if @query.present?
 
     scope.order(:name, :hostid).limit(@limit).map do |host|
@@ -54,5 +58,9 @@ class ZabbixConnections::HostDropdownFetcher
     value = limit.to_i
     value = DEFAULT_LIMIT if value <= 0
     [value, MAX_LIMIT].min
+  end
+
+  def excluded_status?(status)
+    EXCLUDED_STATUSES.include?(status.to_s)
   end
 end

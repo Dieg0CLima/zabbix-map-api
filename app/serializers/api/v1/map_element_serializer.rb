@@ -1,6 +1,9 @@
 class Api::V1::MapElementSerializer
-  def initialize(map_node)
+  PING_UP_HIGHLIGHT_COLOR = "#00c853".freeze
+
+  def initialize(map_node, site_ping_visual: nil)
     @map_node = map_node
+    @site_ping_visual = site_ping_visual || {}
   end
 
   def as_json(*)
@@ -18,16 +21,27 @@ class Api::V1::MapElementSerializer
       lng: @map_node.lng,
       width: @map_node.width,
       height: @map_node.height,
-      color_override: @map_node.color,
+      color_override: resolved_color_override,
       icon_override: @map_node.icon,
       visible: @map_node.visible,
       locked: @map_node.metadata["locked"] || false,
       metadata: @map_node.metadata,
+      monitoring_ping: @site_ping_visual,
       mappable: serialized_mappable
     }
   end
 
   private
+
+  def resolved_color_override
+    return PING_UP_HIGHLIGHT_COLOR if ping_up?
+
+    @map_node.color
+  end
+
+  def ping_up?
+    @map_node.mappable_type == "Site" && @site_ping_visual[:status] == "up"
+  end
 
   def serialized_mappable
     case @map_node.mappable

@@ -49,7 +49,8 @@ module Zabbix
           h.name,
           h.status::text AS status
         FROM hosts h
-        WHERE (h.name ILIKE $1 OR h.host ILIKE $1 OR h.hostid::text ILIKE $1)
+        WHERE h.status <> 3
+          AND (h.name ILIKE $1 OR h.host ILIKE $1 OR h.hostid::text ILIKE $1)
         ORDER BY h.name_upper NULLS LAST, h.name, h.hostid
         LIMIT $2
       SQL
@@ -63,7 +64,8 @@ module Zabbix
           h.name,
           CAST(h.status AS CHAR) AS status
         FROM hosts h
-        WHERE (h.name LIKE ? OR h.host LIKE ? OR CAST(h.hostid AS CHAR) LIKE ?)
+        WHERE h.status <> 3
+          AND (h.name LIKE ? OR h.host LIKE ? OR CAST(h.hostid AS CHAR) LIKE ?)
         ORDER BY h.name_upper, h.name, h.hostid
         LIMIT ?
       SQL

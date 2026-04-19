@@ -1,4 +1,6 @@
 class NetworkMap < ApplicationRecord
+  BASE_LAYERS = %w[standard terrain hot cycle light voyager dark satellite streets topo].freeze
+
   belongs_to :organization
   belongs_to :zabbix_connection, optional: true
 
@@ -12,5 +14,5 @@ class NetworkMap < ApplicationRecord
   validates :name, presence: true
   validates :name, uniqueness: { scope: :organization_id }
   validates :source_type, inclusion: { in: %w[manual zabbix hybrid] }
-  validates :active_base_layer, inclusion: { in: %w[standard terrain dark] }
+  validates :active_base_layer, inclusion: { in: BASE_LAYERS }
 end

@@ -63,4 +63,65 @@ class NetworkMaps::CableMetricsPayloadBuilderTest < ActiveSupport::TestCase
     assert_equal 96.0, cable_payload.dig(:operational_details, :max_utilization_pct)
     assert_equal 100, cable_payload.dig(:operational_details, :capacity_mbps)
   end
+
+  test "maps ifOperStatus degraded values to degraded zabbix_status" do
+    network_map, cable, _status_item = build_map_with_status_item(lastvalue: "7")
+
+    payload = NetworkMaps::CableMetricsPayloadBuilder.new(network_map: network_map).call
+    cable_payload = payload[:cables].find { |entry| entry[:id] == cable.id }
+
+    assert_equal "degraded", cable_payload[:zabbix_status]
+  end
+
+  test "maps ifOperStatus unknown values to unknown zabbix_status" do
+    network_map, cable, _status_item = build_map_with_status_item(lastvalue: "not_present")
+
+    payload = NetworkMaps::CableMetricsPayloadBuilder.new(network_map: network_map).call
+    cable_payload = payload[:cables].find { |entry| entry[:id] == cable.id }
+
+    assert_equal "unknown", cable_payload[:zabbix_status]
+  end
+
+  private
+
+  def build_map_with_status_item(lastvalue:)
+    organization = Organization.create!(name: "Org Cable Status #{SecureRandom.hex(4)}")
+    connection = organization.zabbix_connections.create!(
+      name: "Conn Status #{SecureRandom.hex(3)}",
+      connection_mode: "api",
+      status: "active",
+      base_url: "https://zabbix.example.com"
+    )
+    network_map = organization.network_maps.create!(
+      name: "Mapa Status #{SecureRandom.hex(3)}",
+      source_type: "manual",
+      zabbix_connection: connection
+    )
+    source_pop = network_map.map_pops.create!(
+      name: "POP Status",
+      external_id: "pop-status-#{SecureRandom.hex(3)}",
+      lat: -23.10,
+      lng: -46.10,
+      color: "#7c3aed"
+    )
+
+    cable = network_map.network_cables.create!(
+      source_pop: source_pop,
+      label: "Cabo Status",
+      status: "active",
+      bandwidth_mbps: 100
+    )
+
+    status_item = connection.zabbix_items.create!(
+      itemid: "status-#{SecureRandom.hex(4)}",
+      name: "ifOperStatus",
+      key_: "net.if.status[1]",
+      units: "",
+      lastvalue: lastvalue,
+      lastclock: Time.current
+    )
+
+    cable.network_cable_items.create!(zabbix_item: status_item, metric_role: "status")
+    [network_map, cable, status_item]
+  end
 end
