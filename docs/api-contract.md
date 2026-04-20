@@ -4,6 +4,15 @@ Este documento descreve um contrato recomendado para o frontend consumir mapas, 
 
 ## 0) Segurança (padrão Devise + JWT)
 
+### 0.1) Modo de tenancy da instalação
+
+A API agora suporta configuração por ambiente:
+
+- `TENANCY_MODE=multi` (padrão atual; compatível com `organization_id/org_id` em request)
+- `TENANCY_MODE=single` (single-tenant por instalação)
+
+No modo `single`, o backend resolve a organização local automaticamente (opcionalmente via `TENANCY_ORGANIZATION_ID`) e as chamadas podem omitir `organization_id`.
+
 Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT:
 
 - `POST /api/v1/users/sign_in` para login (retorna `Authorization: Bearer <token>`).
@@ -12,6 +21,7 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 - enviar sempre `Authorization: Bearer <token>` nas chamadas autenticadas.
 - o token JWT expira em `4 horas` a partir do login.
 - a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
+- no modo `single`, o login pode ser feito sem `organization_id`; a organização local é resolvida pelo backend.
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
@@ -43,9 +53,37 @@ No frontend, cada cabo é renderizado assim:
 - `POST /api/v1/network_maps`
 - `PATCH /api/v1/network_maps/:id`
 - `DELETE /api/v1/network_maps/:id`
+- `POST /api/v1/network_maps/imports/preview`
+- `POST /api/v1/network_maps/imports/apply`
+- `GET /api/v1/network_maps/imports/:import_id/status`
 - `GET /api/v1/network_maps/:id/metrics`
 - `GET /api/v1/network_maps/:id/events`
 - `GET /api/v1/network_maps/:id/cable_metrics`
+
+Os endpoints de importação aceitam `provider` (padrão `kmz`) e input via `file` (upload) ou `input` (texto KML), com `organization_id` no escopo da organização ativa.
+
+Modo assíncrono (`apply`):
+- `POST /api/v1/network_maps/imports/apply` aceita `async=true`;
+- resposta `202 Accepted` retorna `import_id`, `status=queued` e `poll_url`;
+- o cliente consulta `GET /api/v1/network_maps/imports/:import_id/status` até `status=completed|failed`.
+
+Guardrails de importação (`KMZ/KML`):
+- validação de extensão (`.kmz`/`.kml`) quando `file` é enviado;
+- validação de tamanho máximo por `IMPORT_MAX_FILE_BYTES` (default `10MB`);
+- validação de MIME para tipos KML/KMZ e compatíveis;
+- timeout de parsing por `IMPORT_PARSE_TIMEOUT_SECONDS` (default `15s`).
+
+Observabilidade de execução:
+- `report.import_id` para rastreabilidade técnica da importação;
+- `report.timings_ms` com duração das etapas (`resolve_provider`, `parse`, `provider_normalize`, `canonical_normalize`, `execute`);
+- `report.counters` com contadores de nós/cabos (`created`, `updated`, `skipped`, `failed`).
+
+Semântica atual da importação KMZ:
+- `LineString` é persistido com geometria completa em `network_cable_points` (inclui vértices de origem/destino e intermediários), evitando lacunas visuais no Leaflet que desenha cabos a partir de `cable.points`;
+- `Placemark` de `Point` usa `metadata.import_entity` (`site|pop|node`) para materialização opcional:
+  - `site`/`pop`: cria/atualiza `Site` por `site_external_id` e vincula o `MapNode` com `mappable_type = "Site"`;
+  - `pop`: além do `Site`, cria/atualiza `MapPop` por `pop_external_id` e vincula o `MapNode` ao POP;
+  - quando não informado no `ExtendedData`, o adapter KMZ assume `site` para pontos explícitos (não gerados automaticamente).
 
 `active_base_layer` é o layer padrão persistido do mapa e aceita:
 `standard`, `terrain`, `hot`, `cycle`, `light`, `voyager`, `dark`, `satellite`, `streets`, `topo`.
@@ -73,6 +111,7 @@ Regras:
 - o item selecionado precisa ser ICMP (`key_`/`name` compatível com `icmpping`, `icmppingloss` ou `icmppingsec`);
 - se o mapa tiver `zabbix_connection_id`, o item precisa pertencer à mesma conexão;
 - ao criar, apenas o link ICMP do mesmo tipo é substituído (ex.: novo `icmppingloss` substitui somente o `icmppingloss` anterior), permitindo coexistência de `Ping`, `Loss` e `Response Time`.
+- a listagem de `candidates` busca catálogo por host via `ZabbixHosts::ItemsFetcher`, portanto continua retornando itens mesmo quando o cache local de `zabbix_hosts` ainda não possui o host.
 
 Payload de criação (`POST`):
 

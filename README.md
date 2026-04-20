@@ -8,7 +8,12 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 - Guia de desenvolvimento assistido por IA e padrão de documentação contínua: [`docs/ai-development-guidelines.md`](docs/ai-development-guidelines.md)
 - Contrato sugerido para renderização no frontend: [`docs/api-contract.md`](docs/api-contract.md)
 - Compatibilidade e estratégia para KMZ/KML e correlatos: [`docs/kmz-compatibility.md`](docs/kmz-compatibility.md)
+- Plano de execução da integração KMZ (importação desacoplada): [`docs/kmz-integration-execution-plan.md`](docs/kmz-integration-execution-plan.md)
+- Backlog técnico da integração KMZ (issues e PRs por fase): [`docs/kmz-integration-backlog.md`](docs/kmz-integration-backlog.md)
+- Plano de arquitetura para importação desacoplada por múltiplos providers (KMZ, OzMap, GeoSite): [`docs/import-providers-architecture-plan.md`](docs/import-providers-architecture-plan.md)
+- Plano de transição de tenancy (multi-tenant lógico -> single-tenant por instalação + control plane): [`docs/single-tenant-transition-plan.md`](docs/single-tenant-transition-plan.md)
 - Modelo de múltiplas conexões Zabbix e cache de hosts/items: ver seção 3.5 em [`docs/zabbix-map-architecture.md`](docs/zabbix-map-architecture.md)
+- Plano de evolução para atualização quase real-time do mapa: [`docs/realtime-map-refresh-plan.md`](docs/realtime-map-refresh-plan.md)
 
 ## Estado atual
 
