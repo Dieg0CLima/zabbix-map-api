@@ -3,13 +3,14 @@ require "set"
 module Maps
   module Import
     class Executor
-      Result = Struct.new(:network_map, :summary, :report, keyword_init: true)
+      Result = Struct.new(:network_map, :summary, :report, :warnings, keyword_init: true)
 
       def initialize(organization:, normalized_payload:, mode:, network_map: nil)
         @organization = organization
         @normalized_payload = normalized_payload
         @mode = mode.to_s
         @network_map = network_map
+        @warnings = []
       end
 
       def call
@@ -22,7 +23,8 @@ module Maps
         return Result.new(
           network_map: target_map,
           summary: preview_summary,
-          report: build_report(action: "preview", summary: preview_summary)
+          report: build_report(action: "preview", summary: preview_summary),
+          warnings: []
         ) if preview_mode?
 
         ActiveRecord::Base.transaction do
@@ -34,11 +36,13 @@ module Maps
         end
 
         target_map.reload
+        apply_summary = build_apply_summary(target_map, map_action: map_action)
 
         Result.new(
           network_map: target_map,
-          summary: preview_summary,
-          report: build_report(action: "apply", summary: preview_summary)
+          summary: apply_summary,
+          report: build_report(action: "apply", summary: apply_summary),
+          warnings: @warnings.dup
         )
       rescue ActiveRecord::RecordInvalid => e
         raise Maps::Import::Errors::DomainError.new(
@@ -111,6 +115,16 @@ module Maps
 
           candidate_site = generated_endpoint?(metadata) ? nil : site_index[resolve_site_external_id(node_data, metadata)]
           site = resolve_node_site(candidate_site, existing_node, claimed_site_ids)
+
+          if candidate_site && site.nil? && !generated_endpoint?(metadata)
+            @warnings << {
+              "kind" => "node_site_alias",
+              "label" => node_data["label"].to_s,
+              "external_id" => node_data["external_id"],
+              "site_external_id" => resolve_site_external_id(node_data, metadata),
+              "reason" => "site_already_claimed_by_another_node"
+            }
+          end
 
           pop = pop_index[resolve_pop_external_id(node_data, metadata)]
 
@@ -252,7 +266,24 @@ module Maps
         alias_to_target_external_id.each do |source_external_id, target_external_id|
           site = persisted_by_external_id[target_external_id]
           site_index[source_external_id] = site if site
+
+          next if source_external_id == target_external_id
+
+          candidate = candidates.find { |c| c[:source_external_id] == source_external_id }
+          @warnings << {
+            "kind" => "site_deduplicated",
+            "label" => candidate&.dig(:name) || source_external_id,
+            "source_external_id" => source_external_id,
+            "merged_into_external_id" => target_external_id,
+            "reason" => "duplicate_site_name"
+          }
         end
+
+        @site_summary = {
+          created: (target_external_ids - existing_by_external_id.keys).size,
+          reused: (target_external_ids & existing_by_external_id.keys).size,
+          deduplicated: alias_to_target_external_id.count { |src, tgt| src != tgt }
+        }
 
         site_index
       end
@@ -413,13 +444,29 @@ module Maps
           map: map_action,
           nodes: {
             created: payload_nodes.count { |id| !existing_nodes.include?(id) },
-            updated: payload_nodes.count { |id| existing_nodes.include?(id) }
+            updated: payload_nodes.count { |id| existing_nodes.include?(id) },
+            skipped: 0,
+            failed: 0
           },
           cables: {
             created: payload_cables.count { |id| !existing_cables.include?(id) },
-            updated: payload_cables.count { |id| existing_cables.include?(id) }
-          }
+            updated: payload_cables.count { |id| existing_cables.include?(id) },
+            skipped: 0,
+            failed: 0
+          },
+          sites: { created: 0, reused: 0, deduplicated: 0 }
         }
+      end
+
+      # Builds the post-apply summary using real persisted state and accumulated warnings.
+      def build_apply_summary(network_map, map_action:)
+        base = build_summary_for(network_map, map_action: map_action)
+
+        alias_skipped = @warnings.count { |w| w["kind"] == "node_site_alias" }
+        base[:nodes][:skipped] = alias_skipped
+
+        base[:sites] = @site_summary || { created: 0, reused: 0, deduplicated: 0 }
+        base
       end
 
       def build_report(action:, summary:)

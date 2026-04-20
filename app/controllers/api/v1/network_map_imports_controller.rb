@@ -14,7 +14,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
         summary: result.summary,
         report: result.report,
         normalized_payload: result.normalized_payload,
-        warnings: [],
+        warnings: Array(result.warnings),
         target_map: {
           action: result.summary[:map],
           network_map_id: result.network_map&.id
@@ -36,6 +36,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       data: {
         summary: result.summary,
         report: result.report,
+        warnings: Array(result.warnings),
         network_map_id: result.network_map.id,
         network_map_name: result.network_map.name
       }
