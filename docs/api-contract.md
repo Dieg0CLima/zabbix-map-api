@@ -4,6 +4,15 @@ Este documento descreve um contrato recomendado para o frontend consumir mapas, 
 
 ## 0) Segurança (padrão Devise + JWT)
 
+### 0.1) Modo de tenancy da instalação
+
+A API agora suporta configuração por ambiente:
+
+- `TENANCY_MODE=multi` (padrão atual; compatível com `organization_id/org_id` em request)
+- `TENANCY_MODE=single` (single-tenant por instalação)
+
+No modo `single`, o backend resolve a organização local automaticamente (opcionalmente via `TENANCY_ORGANIZATION_ID`) e as chamadas podem omitir `organization_id`.
+
 Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT:
 
 - `POST /api/v1/users/sign_in` para login (retorna `Authorization: Bearer <token>`).
@@ -43,9 +52,13 @@ No frontend, cada cabo é renderizado assim:
 - `POST /api/v1/network_maps`
 - `PATCH /api/v1/network_maps/:id`
 - `DELETE /api/v1/network_maps/:id`
+- `POST /api/v1/network_maps/imports/preview`
+- `POST /api/v1/network_maps/imports/apply`
 - `GET /api/v1/network_maps/:id/metrics`
 - `GET /api/v1/network_maps/:id/events`
 - `GET /api/v1/network_maps/:id/cable_metrics`
+
+Os endpoints de importação aceitam `provider` (padrão `kmz`) e input via `file` (upload) ou `input` (texto KML), com `organization_id` no escopo da organização ativa.
 
 `active_base_layer` é o layer padrão persistido do mapa e aceita:
 `standard`, `terrain`, `hot`, `cycle`, `light`, `voyager`, `dark`, `satellite`, `streets`, `topo`.

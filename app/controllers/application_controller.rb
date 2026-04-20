@@ -17,21 +17,7 @@ class ApplicationController < ActionController::API
   end
 
   def current_organization
-    @current_organization ||= begin
-      organization_id = params[:organization_id] || params[:org_id]
-
-      if organization_id.present?
-        if current_user.admin?
-          Organization.find_by(id: organization_id)
-        else
-          current_user.organizations.find_by(id: organization_id)
-        end
-      elsif current_user.admin?
-        nil
-      else
-        current_user.current_organization
-      end
-    end
+    @current_organization ||= Tenancy::Resolver.current_organization(user: current_user, params: params)
   end
 
   def current_membership
@@ -41,6 +27,13 @@ class ApplicationController < ActionController::API
   end
 
   def ensure_organization_access!
+    if Tenancy::Resolver.single_tenant_mode?
+      return if current_organization.present?
+
+      render json: { error: "Organization not configured for this installation" }, status: :service_unavailable
+      return
+    end
+
     return if current_user.admin? && params[:organization_id].blank? && params[:org_id].blank?
     return if current_organization.present?
 

@@ -100,6 +100,9 @@ Rails.application.routes.draw do
         end
       end
 
+      post "network_maps/imports/preview", to: "network_map_imports#preview"
+      post "network_maps/imports/apply", to: "network_map_imports#apply"
+
       resources :legacy_network_maps, controller: "network_maps", path: "legacy/network_maps" do
         resources :map_pops
         resources :map_nodes do
