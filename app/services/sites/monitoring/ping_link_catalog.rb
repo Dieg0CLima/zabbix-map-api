@@ -1,6 +1,8 @@
 module Sites
   module Monitoring
     class PingLinkCatalog
+      FETCH_LIMIT = 2_000
+
       def initialize(network_map:, site:)
         @network_map = network_map
         @site = site
@@ -61,15 +63,7 @@ module Sites
         profile ||= Devices::MonitoringProfileSync.new(device: device).call if device.zabbix_host_link.present?
         return [] unless profile&.linked?
 
-        host = profile.zabbix_connection.zabbix_hosts.find_by(hostid: profile.zabbix_hostid.to_s)
-        return [] unless host
-
-        items = profile
-                .zabbix_connection
-                .zabbix_items
-                .where(zabbix_host_id: host.id)
-                .order(:id)
-                .select { |item| PingItemMatcher.icmp_metric_item?(item) }
+        items = device_ping_items(device)
 
         items.map do |item|
           live = live_values[item.itemid.to_s] || {}
@@ -99,18 +93,7 @@ module Sites
 
       def candidate_zabbix_items
         @candidate_zabbix_items ||= site.devices.includes(:zabbix_host_link, monitoring_profile: { device_monitoring_items: :zabbix_item }).flat_map do |device|
-          profile = device.monitoring_profile
-          profile ||= Devices::MonitoringProfileSync.new(device: device).call if device.zabbix_host_link.present?
-          next [] unless profile&.linked?
-
-          host = profile.zabbix_connection.zabbix_hosts.find_by(hostid: profile.zabbix_hostid.to_s)
-          next [] unless host
-
-          profile.zabbix_connection
-                 .zabbix_items
-                 .where(zabbix_host_id: host.id)
-                 .order(:id)
-                 .select { |item| PingItemMatcher.icmp_metric_item?(item) }
+          device_ping_items(device)
         end
       end
 
@@ -134,6 +117,34 @@ module Sites
         Time.zone.at(clock.to_i).utc.iso8601
       rescue StandardError
         nil
+      end
+
+      def device_ping_items(device)
+        @device_ping_items ||= {}
+        return @device_ping_items[device.id] if @device_ping_items.key?(device.id)
+
+        profile = device.monitoring_profile
+        profile ||= Devices::MonitoringProfileSync.new(device: device).call if device.zabbix_host_link.present?
+        return @device_ping_items[device.id] = [] unless profile&.linked?
+
+        raw_items = ZabbixHosts::ItemsFetcher.new(
+          connection: profile.zabbix_connection,
+          hostid: profile.zabbix_hostid,
+          limit: FETCH_LIMIT
+        ).call
+
+        item_ids = raw_items.filter_map { |item| item[:value].presence&.to_i }.uniq
+        items_by_id = profile.zabbix_connection.zabbix_items.where(id: item_ids).index_by(&:id)
+
+        @device_ping_items[device.id] = raw_items.filter_map do |raw|
+          item = items_by_id[raw[:value].to_i]
+          next unless item
+          next unless PingItemMatcher.icmp_metric_item?(item)
+
+          item
+        end
+      rescue ZabbixHosts::ItemsFetcher::Error
+        @device_ping_items[device.id] = []
       end
     end
   end

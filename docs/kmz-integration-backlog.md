@@ -8,6 +8,16 @@ Este backlog transforma o plano `docs/kmz-integration-execution-plan.md` em entr
 - Estratégia de merge: PRs pequenos, reversíveis e com teste por camada
 - Regra de segurança: `preview` antes de `apply`
 
+## Status de implementação (2026-04-20)
+
+- Fase A: concluída (`A1`..`A5`)
+- Fase B: concluída (`B1`..`B3`)
+- Fase C: concluída (`C1`..`C3`)
+- Fase D:
+  - `D1` implementado no fluxo síncrono (guardrails de extensão/MIME/tamanho + timeout de parse)
+  - `D2` implementado para trilha técnica básica (`import_id`, `timings_ms`, `counters`)
+  - `D3` implementado no MVP (`apply` assíncrono com `ActiveJob` + endpoint de status por `import_id`)
+
 ## Fase A — Núcleo do pipeline (sem KMZ)
 
 ## Issue A1 — Contrato canônico v1

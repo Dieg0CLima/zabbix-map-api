@@ -10,6 +10,9 @@ Migrar esta API para operar como **single-tenant por instalação** (um cliente 
   - `Tenancy::Resolver` introduzido no backend;
   - `TENANCY_MODE` suportado com default `multi`;
   - `ApplicationController#current_organization` delegando para o resolver.
+- Avanços já aplicados:
+  - `SessionsController` agora resolve organização via `Tenancy::Resolver` no modo `single` (sem exigir `organization_id`);
+  - login possui fallback explícito de emissão de JWT quando `warden-jwt_auth.token` não vier preenchido.
 - Com `TENANCY_MODE=multi`, o comportamento permanece compatível com o fluxo atual.
 
 ## Contexto atual

@@ -44,6 +44,7 @@ services:
       DEFAULT_ADMIN_PASSWORD: "admin123"
       DEFAULT_ORG_ADMIN_EMAIL: "org-admin@zabbix-map.local"
       DEFAULT_ORG_ADMIN_PASSWORD: "orgadmin123"
+      TENANCY_MODE: "single"
     ports:
       - "3000:3000"
     volumes:

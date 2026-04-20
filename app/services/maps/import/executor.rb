@@ -27,7 +27,9 @@ module Maps
 
         ActiveRecord::Base.transaction do
           persist_map!(target_map)
-          node_index = upsert_nodes!(target_map)
+          site_index = upsert_sites!
+          pop_index = upsert_pops!(target_map, site_index)
+          node_index = upsert_nodes!(target_map, site_index: site_index, pop_index: pop_index)
           upsert_cables!(target_map, node_index)
         end
 
@@ -90,12 +92,29 @@ module Maps
         network_map.save!
       end
 
-      def upsert_nodes!(network_map)
+      def upsert_nodes!(network_map, site_index:, pop_index:)
         existing = network_map.map_nodes.index_by(&:external_id)
         node_index = {}
 
+        # Track which Site IDs already have a canonical MapNode so that alias nodes
+        # (multiple nodes pointing to the same Site via name deduplication or explicit
+        # site_external_id) don't trigger the mappable_uniqueness_within_map validation.
+        # Pre-seed with sites already owned by existing nodes — idempotent re-imports
+        # will re-claim them correctly via the existing_node check below.
+        claimed_site_ids = existing.values
+          .filter_map { |n| n.mappable_id if n.mappable_type == "Site" }
+          .to_set
+
         @normalized_payload.fetch("nodes").each do |node_data|
-          node = existing[node_data["external_id"]] || network_map.map_nodes.new(external_id: node_data["external_id"])
+          metadata = safe_hash(node_data["metadata"])
+          existing_node = existing[node_data["external_id"]]
+
+          candidate_site = generated_endpoint?(metadata) ? nil : site_index[resolve_site_external_id(node_data, metadata)]
+          site = resolve_node_site(candidate_site, existing_node, claimed_site_ids)
+
+          pop = pop_index[resolve_pop_external_id(node_data, metadata)]
+
+          node = existing_node || network_map.map_nodes.new(external_id: node_data["external_id"])
           node.assign_attributes(
             label: node_data["label"],
             node_kind: node_data["node_kind"],
@@ -103,13 +122,35 @@ module Maps
             lng: node_data["lng"],
             x: node_data["lat"],
             y: node_data["lng"],
-            metadata: node_data["metadata"]
+            map_pop: pop,
+            mappable: site,
+            metadata: metadata
           )
           node.save!
           node_index[node.external_id] = node
         end
 
         node_index
+      end
+
+      # Returns the site a node should be mapped to, enforcing one MapNode per Site.
+      # An existing node that already owns the candidate site is allowed to re-claim it
+      # (idempotent update, handled by the model's where.not(id:) guard).
+      # Any other node loses the claim and receives nil.
+      def resolve_node_site(candidate_site, existing_node, claimed_site_ids)
+        return nil if candidate_site.nil?
+
+        already_owns = existing_node&.mappable_type == "Site" &&
+                       existing_node&.mappable_id == candidate_site.id
+
+        if already_owns
+          candidate_site
+        elsif claimed_site_ids.include?(candidate_site.id)
+          nil
+        else
+          claimed_site_ids.add(candidate_site.id)
+          candidate_site
+        end
       end
 
       def upsert_cables!(network_map, node_index)
@@ -132,19 +173,233 @@ module Maps
       end
 
       def replace_cable_points!(cable, points_data)
-        cable.network_cable_points.destroy_all
+        cable.network_cable_points.delete_all
 
-        Array(points_data).each_with_index do |point, idx|
+        rows = Array(points_data).each_with_index.filter_map do |point, idx|
           lat = point["lat"]
           lng = point["lng"]
-          position = point["position"] || idx + 1
+          next if lat.nil? || lng.nil?
 
-          cable.network_cable_points.create!(
-            position: position.to_i,
+          {
+            network_cable_id: cable.id,
+            position: (point["position"] || idx).to_i,
             x: lat,
-            y: lng
-          )
+            y: lng,
+            created_at: Time.current,
+            updated_at: Time.current
+          }
         end
+
+        return if rows.empty?
+
+        deduplicated_rows = rows
+          .group_by { |row| row[:position] }
+          .sort_by { |(position, _rows)| position }
+          .map(&:last)
+          .map(&:last)
+
+        NetworkCablePoint.insert_all!(deduplicated_rows)
+      end
+
+      def upsert_sites!
+        candidates = @normalized_payload.fetch("nodes").filter_map do |node_data|
+          metadata = safe_hash(node_data["metadata"])
+          next if generated_endpoint?(metadata)
+
+          import_entity = metadata["import_entity"].to_s
+          next unless import_entity.in?(%w[site pop])
+
+          source_external_id = resolve_site_external_id(node_data, metadata)
+          next if source_external_id.blank?
+
+          raw_name = metadata["site_name"].to_s.strip.presence || node_data["label"].to_s.strip.presence || source_external_id
+          name = sanitize_site_name(raw_name, fallback_external_id: source_external_id)
+
+          {
+            source_external_id: source_external_id,
+            name: name,
+            name_key: site_name_key(name),
+            lat: node_data["lat"],
+            lng: node_data["lng"],
+            source_node_external_id: node_data["external_id"]
+          }
+        end
+
+        return {} if candidates.empty?
+
+        source_external_ids = candidates.map { |row| row[:source_external_id] }.uniq
+        name_keys = candidates.map { |row| row[:name_key] }.uniq
+
+        existing_by_external_id = @organization.sites.where(external_id: source_external_ids).index_by(&:external_id)
+        existing_by_name_key = @organization.sites.each_with_object({}) do |site, memo|
+          memo[site_name_key(site.name)] ||= site
+        end.slice(*name_keys)
+
+        result = build_site_upsert_rows(
+          candidates: candidates,
+          existing_by_external_id: existing_by_external_id,
+          existing_by_name_key: existing_by_name_key
+        )
+        rows = result[:rows]
+        alias_to_target_external_id = result[:alias_to_target_external_id]
+
+        perform_site_upsert_with_retry!(rows: rows, candidates: candidates, existing_by_external_id: existing_by_external_id)
+
+        target_external_ids = rows.map { |row| row[:external_id] }.uniq
+        persisted_by_external_id = @organization.sites.where(external_id: target_external_ids).index_by(&:external_id)
+
+        site_index = persisted_by_external_id.dup
+        alias_to_target_external_id.each do |source_external_id, target_external_id|
+          site = persisted_by_external_id[target_external_id]
+          site_index[source_external_id] = site if site
+        end
+
+        site_index
+      end
+
+      def perform_site_upsert_with_retry!(rows:, candidates:, existing_by_external_id:)
+        Site.upsert_all(rows, unique_by: :index_sites_on_organization_id_and_external_id)
+      rescue ActiveRecord::RecordNotUnique
+        # Concurrent imports may insert the same site name between read and upsert.
+        refreshed_by_name_key = @organization.sites.each_with_object({}) do |site, memo|
+          memo[site_name_key(site.name)] ||= site
+        end.slice(*candidates.map { |row| row[:name_key] }.uniq)
+
+        retried_rows = build_site_upsert_rows(
+          candidates: candidates,
+          existing_by_external_id: existing_by_external_id,
+          existing_by_name_key: refreshed_by_name_key
+        )[:rows]
+
+        Site.upsert_all(retried_rows, unique_by: :index_sites_on_organization_id_and_external_id)
+      end
+
+      def build_site_upsert_rows(candidates:, existing_by_external_id:, existing_by_name_key:)
+        now = Time.current
+        alias_to_target_external_id = {}
+        rows_by_external_id = {}
+        target_external_id_by_name_key = {}
+
+        candidates.each do |candidate|
+          name = candidate[:name]
+          name_key = candidate[:name_key]
+          existing_site_for_name = existing_by_name_key[name_key]
+          existing_site_for_external_id = existing_by_external_id[candidate[:source_external_id]]
+          batch_target_external_id = target_external_id_by_name_key[name_key]
+
+          target_external_id = if existing_site_for_name.present?
+            existing_site_for_name.external_id
+          elsif batch_target_external_id.present?
+            batch_target_external_id
+          elsif existing_site_for_external_id.present?
+            existing_site_for_external_id.external_id
+          else
+            candidate[:source_external_id]
+          end
+
+          alias_to_target_external_id[candidate[:source_external_id]] = target_external_id
+          target_external_id_by_name_key[name_key] ||= target_external_id
+
+          row = {
+            organization_id: @organization.id,
+            external_id: target_external_id,
+            name: name,
+            slug: existing_site_for_name&.slug.presence || existing_site_for_external_id&.slug.presence || slug_for_site(name, target_external_id),
+            lat: candidate[:lat],
+            lng: candidate[:lng],
+            status: "active",
+            metadata: {
+              "import" => {
+                "provider" => @normalized_payload["provider"],
+                "source_node_external_id" => candidate[:source_node_external_id]
+              }
+            },
+            created_at: now,
+            updated_at: now
+          }
+
+          rows_by_external_id[target_external_id] = row
+        end
+
+        {
+          rows: rows_by_external_id.values,
+          alias_to_target_external_id: alias_to_target_external_id
+        }
+      end
+
+      def upsert_pops!(network_map, site_index)
+        candidates = @normalized_payload.fetch("nodes").filter_map do |node_data|
+          metadata = safe_hash(node_data["metadata"])
+          next if generated_endpoint?(metadata)
+          next unless metadata["import_entity"].to_s == "pop"
+
+          external_id = resolve_pop_external_id(node_data, metadata)
+          next if external_id.blank?
+
+          site_external_id = resolve_site_external_id(node_data, metadata)
+          site_id = site_external_id.present? ? site_index[site_external_id]&.id : nil
+
+          {
+            network_map_id: network_map.id,
+            external_id: external_id,
+            name: metadata["pop_name"].to_s.strip.presence || node_data["label"].to_s.strip.presence || external_id,
+            lat: node_data["lat"],
+            lng: node_data["lng"],
+            color: metadata["pop_color"].to_s.strip.presence || "#7c3aed",
+            site_id: site_id,
+            metadata: {
+              "import" => {
+                "provider" => @normalized_payload["provider"],
+                "source_node_external_id" => node_data["external_id"],
+                "site_external_id" => site_external_id
+              }
+            },
+            created_at: Time.current,
+            updated_at: Time.current
+          }
+        end
+
+        return {} if candidates.empty?
+
+        MapPop.upsert_all(candidates, unique_by: :index_map_pops_on_network_map_id_and_external_id)
+
+        external_ids = candidates.map { |row| row[:external_id] }.uniq
+        network_map.map_pops.where(external_id: external_ids).index_by(&:external_id)
+      end
+
+      def resolve_site_external_id(node_data, metadata)
+        metadata["site_external_id"].to_s.strip.presence || node_data["external_id"].to_s.strip
+      end
+
+      def resolve_pop_external_id(node_data, metadata)
+        metadata["pop_external_id"].to_s.strip.presence || node_data["external_id"].to_s.strip
+      end
+
+      def generated_endpoint?(metadata)
+        metadata["generated_endpoint"] == true
+      end
+
+      def safe_hash(value)
+        value.is_a?(Hash) ? value : {}
+      end
+
+      def slug_for_site(name, external_id)
+        base = name.to_s.parameterize
+        base = "site" if base.blank?
+        digest = external_id.to_s.parameterize
+        digest = "imported" if digest.blank?
+        "#{base}-#{digest}".first(120)
+      end
+
+      def sanitize_site_name(name, fallback_external_id:)
+        cleaned = name.to_s.gsub(/\p{Cf}/, "").squish
+        return cleaned if cleaned.present?
+
+        fallback_external_id.to_s
+      end
+
+      def site_name_key(name)
+        sanitize_site_name(name, fallback_external_id: "site").downcase
       end
 
       def build_summary_for(network_map, map_action:)

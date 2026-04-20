@@ -61,11 +61,37 @@ class Maps::Import::Providers::KmzAdapterTest < ActiveSupport::TestCase
     cable = normalized["cables"].first
     assert_equal "up", cable["status"]
     assert_equal "fiber", cable["cable_type"]
-    assert_equal 1, cable["points"].size
+    assert_equal 3, cable["points"].size
+    assert_equal 0, cable["points"].first["position"]
+    assert_equal -23.55, cable["points"].first["lat"]
 
     node_ids = normalized["nodes"].map { |node| node["external_id"] }
     assert_includes node_ids, cable["source_external_id"]
     assert_includes node_ids, cable["target_external_id"]
+  end
+
+  test "defaults explicit point placemark to site import entity metadata" do
+    adapter = Maps::Import::Providers::KmzAdapter.new
+    kml = <<~XML
+      <kml xmlns="http://www.opengis.net/kml/2.2">
+        <Document>
+          <name>Mapa Site Default</name>
+          <Placemark>
+            <name>Site A</name>
+            <Point>
+              <coordinates>-46.6300,-23.5500,0</coordinates>
+            </Point>
+          </Placemark>
+        </Document>
+      </kml>
+    XML
+
+    parsed = adapter.parse(input: kml)
+    normalized = adapter.normalize(parsed: parsed)
+    node = normalized.fetch("nodes").first
+
+    assert_equal "site", node.dig("metadata", "import_entity")
+    assert_equal node["external_id"], node.dig("metadata", "site_external_id")
   end
 
   test "parses kmz upload and normalizes into canonical contract" do

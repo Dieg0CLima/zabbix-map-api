@@ -74,7 +74,7 @@ module Maps
               index: idx,
               source_node_id: source_node["external_id"],
               target_node_id: target_node["external_id"],
-              middle_points: line_coordinates[1..-2] || [],
+              line_points: line_coordinates,
               source_format: source_format,
               entry_name: entry_name
             )
@@ -132,8 +132,11 @@ module Maps
           coords = point_coordinates(placemark)
           ext = extended_data(placemark)
           name = placemark_name(placemark)
+          import_entity = normalize_import_entity(ext["import_entity"] || ext["entity_type"] || ext["kind"])
 
           external_id = ext["external_id"].presence || deterministic_id("node", index, name, coords)
+          site_external_id = ext["site_external_id"].presence || (import_entity.in?(%w[site pop]) ? external_id : nil)
+          pop_external_id = ext["pop_external_id"].presence || (import_entity == "pop" ? external_id : nil)
 
           {
             "external_id" => external_id,
@@ -145,7 +148,13 @@ module Maps
               "provider_payload" => ext,
               "source_format" => source_format,
               "entry_name" => entry_name,
-              "generated_endpoint" => false
+              "generated_endpoint" => false,
+              "import_entity" => import_entity,
+              "site_external_id" => site_external_id,
+              "site_name" => ext["site_name"].presence || name.presence,
+              "pop_external_id" => pop_external_id,
+              "pop_name" => ext["pop_name"].presence || name.presence,
+              "pop_color" => ext["pop_color"].presence
             }.compact
           }
         end
@@ -166,7 +175,8 @@ module Maps
               "source_format" => source_format,
               "entry_name" => entry_name,
               "generated_endpoint" => true,
-              "endpoint_role" => endpoint
+              "endpoint_role" => endpoint,
+              "import_entity" => "generated_endpoint"
             }.compact
           }
 
@@ -175,7 +185,7 @@ module Maps
           node
         end
 
-        def build_cable(placemark:, index:, source_node_id:, target_node_id:, middle_points:, source_format:, entry_name:)
+        def build_cable(placemark:, index:, source_node_id:, target_node_id:, line_points:, source_format:, entry_name:)
           ext = extended_data(placemark)
           name = placemark_name(placemark)
           external_id = ext["external_id"].presence || deterministic_id("cable", index, name, source_node_id, target_node_id)
@@ -192,9 +202,9 @@ module Maps
               "source_format" => source_format,
               "entry_name" => entry_name
             }.compact,
-            "points" => middle_points.each_with_index.map do |point, idx|
+            "points" => line_points.each_with_index.map do |point, idx|
               {
-                "position" => idx + 1,
+                "position" => idx,
                 "lat" => point[:lat],
                 "lng" => point[:lng]
               }
@@ -210,7 +220,20 @@ module Maps
           ext = placemark[:extended_data] || placemark["extended_data"]
           return {} unless ext.is_a?(Hash)
 
-          ext.deep_stringify_keys
+          ext.each_with_object({}) do |(key, value), acc|
+            normalized_key = key.to_s.strip.downcase
+            next if normalized_key.blank?
+
+            acc[normalized_key] = value
+          end
+        end
+
+        def normalize_import_entity(value)
+          candidate = value.to_s.strip.downcase
+          return "site" if candidate.blank?
+          return candidate if %w[site pop node].include?(candidate)
+
+          "site"
         end
 
         def coordinate_key(point)

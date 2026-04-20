@@ -49,6 +49,16 @@ class Maps::Import::Kmz::ArchiveReaderTest < ActiveSupport::TestCase
     assert_equal "import_kmz_missing_kml", error.code
   end
 
+  test "handles binary string input with null byte without treating it as path" do
+    binary = "PK\x03\x04\x00INVALID".b
+
+    error = assert_raises(Maps::Import::Errors::DomainError) do
+      Maps::Import::Kmz::ArchiveReader.call(input: binary)
+    end
+
+    assert_equal "import_invalid_input", error.code
+  end
+
   private
 
   def build_upload(filename, content)

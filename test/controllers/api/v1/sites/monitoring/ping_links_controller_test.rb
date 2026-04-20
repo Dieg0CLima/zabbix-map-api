@@ -154,6 +154,21 @@ class Api::V1::Sites::Monitoring::PingLinksControllerTest < ActionDispatch::Inte
     assert_equal "loss", loss_candidate["metric_kind"]
   end
 
+  test "show returns candidates even when local zabbix_host cache is missing" do
+    @host.destroy!
+    @icmp_item.update!(zabbix_host: nil)
+
+    get show_path, headers: auth_headers, as: :json
+
+    assert_response :ok
+    body = JSON.parse(response.body)
+    candidate = body.dig("data", "candidates").find { |entry| entry["zabbix_item_id"] == @icmp_item.id }
+
+    assert_not_nil candidate
+    assert_equal @device.id, candidate.dig("device", "id")
+    assert_equal "ping", candidate["metric_kind"]
+  end
+
   test "rejects non icmp item link" do
     post create_path, params: {
       monitoring_ping_link: {

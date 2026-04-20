@@ -36,7 +36,12 @@ module Maps
             tempfile.rewind if tempfile.respond_to?(:rewind)
             return [ tempfile.read.to_s, @input.original_filename.to_s, tempfile.path ]
           end
-          return [ File.binread(@input), File.basename(@input), @input ] if @input.is_a?(String) && File.file?(@input)
+          if @input.is_a?(String)
+            # Binary payloads (async job path) can include null bytes and must not
+            # be treated as filesystem paths.
+            return [ @input, nil, nil ] if @input.include?("\x00")
+            return [ File.binread(@input), File.basename(@input), @input ] if File.file?(@input)
+          end
           return [ @input.read.to_s, nil, nil ] if @input.respond_to?(:read)
 
           [ @input.to_s, nil, nil ]

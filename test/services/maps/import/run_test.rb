@@ -33,6 +33,55 @@ class Maps::Import::RunTest < ActiveSupport::TestCase
     assert_equal "unsupported_import_provider", error.code
   end
 
+  test "adds import observability metadata into report" do
+    organization = Organization.create!(name: "Org Import Report #{SecureRandom.hex(3)}")
+    payload = provider_payload(name: "Mapa Report #{SecureRandom.hex(3)}")
+
+    result = Maps::Import::Run.new(
+      organization: organization,
+      provider: "kmz",
+      input: payload,
+      mode: "preview"
+    ).call
+
+    assert result.report[:import_id].present?
+    assert result.report[:timings_ms].is_a?(Hash)
+    assert result.report.dig(:timings_ms, :parse).is_a?(Numeric)
+    assert_equal 0, result.report.dig(:counters, :nodes, :failed)
+  end
+
+  test "raises domain error when parse stage exceeds timeout" do
+    organization = Organization.create!(name: "Org Import Timeout #{SecureRandom.hex(3)}")
+    original_timeout = ENV["IMPORT_PARSE_TIMEOUT_SECONDS"]
+    ENV["IMPORT_PARSE_TIMEOUT_SECONDS"] = "0.001"
+
+    slow_adapter_class = Class.new do
+      def parse(input:)
+        sleep 0.02
+        input
+      end
+
+      def normalize(parsed:)
+        parsed
+      end
+    end
+
+    error = Maps::Import::ProviderRegistry.stub(:resolve!, slow_adapter_class) do
+      assert_raises(Maps::Import::Errors::DomainError) do
+        Maps::Import::Run.new(
+          organization: organization,
+          provider: "kmz",
+          input: provider_payload(name: "Mapa Timeout"),
+          mode: "preview"
+        ).call
+      end
+    end
+
+    assert_equal "import_parse_timeout", error.code
+  ensure
+    ENV["IMPORT_PARSE_TIMEOUT_SECONDS"] = original_timeout
+  end
+
   private
 
   def provider_payload(name:)
