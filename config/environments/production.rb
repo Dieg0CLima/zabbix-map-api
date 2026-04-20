@@ -22,10 +22,10 @@ Rails.application.configure do
   config.active_storage.service = :local
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  config.assume_ssl = true
+  config.assume_ssl = ENV.fetch("RAILS_ASSUME_SSL", "false") == "true"
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  config.force_ssl = true
+  config.force_ssl = ENV.fetch("RAILS_FORCE_SSL", "false") == "true"
 
   # Skip http-to-https redirect for the default health check endpoint.
   # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
@@ -69,6 +69,11 @@ Rails.application.configure do
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).
   config.i18n.fallbacks = true
+
+  # ActionCable allowed origins — comma-separated list via env var, e.g. "http://10.1.32.62:8085,https://myapp.com"
+  # Falls back to allowing all HTTP/HTTPS origins if not set (suitable for internal/dev-prod setups).
+  _cable_origins_env = ENV.fetch("ACTION_CABLE_ALLOWED_ORIGINS", "").split(",").map(&:strip).reject(&:empty?)
+  config.action_cable.allowed_request_origins = _cable_origins_env.presence || [/https?:\/\/.*/]
 
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false
