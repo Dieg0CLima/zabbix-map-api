@@ -4,7 +4,7 @@ require "timeout"
 module Maps
   module Import
     class Run
-      Result = Struct.new(:network_map, :summary, :report, :normalized_payload, keyword_init: true)
+      Result = Struct.new(:network_map, :summary, :report, :normalized_payload, :warnings, keyword_init: true)
 
       def initialize(organization:, provider:, input:, mode:, network_map: nil, import_id: nil)
         @organization = organization
@@ -34,15 +34,26 @@ module Maps
           ).call
         end
 
+        adapter_warnings = Array(normalized_payload["adapter_warnings"])
+        all_warnings = adapter_warnings + Array(execution.warnings)
+
         report = execution.report.merge(
           import_id: @import_id,
           timings_ms: durations,
-          counters: counters_from_summary(execution.summary)
+          counters: counters_from_summary(execution.summary),
+          warnings_count: all_warnings.size
         )
 
-        log_event("import.completed", mode: @mode, provider: @provider, timings_ms: durations, summary: execution.summary)
+        log_event("import.completed", mode: @mode, provider: @provider, timings_ms: durations, summary: execution.summary,
+                  warnings_count: all_warnings.size)
 
-        Result.new(network_map: execution.network_map, summary: execution.summary, report: report, normalized_payload: normalized_payload)
+        Result.new(
+          network_map: execution.network_map,
+          summary: execution.summary,
+          report: report,
+          normalized_payload: normalized_payload,
+          warnings: all_warnings
+        )
       rescue Maps::Import::Errors::DomainError => e
         log_event("import.failed", mode: @mode, provider: @provider, error_code: e.code, error_message: e.message)
         raise

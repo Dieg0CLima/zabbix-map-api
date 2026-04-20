@@ -33,11 +33,19 @@ module Maps
 
           nodes = []
           coordinate_index = {}
+          adapter_warnings = []
 
           point_placemarks = placemarks.select { |item| geometry_type(item) == "point" }
           point_placemarks.each_with_index do |placemark, idx|
             coordinate = point_coordinates(placemark)
-            next if coordinate.blank?
+            if coordinate.blank?
+              adapter_warnings << {
+                "kind" => "node_skipped",
+                "label" => placemark_name(placemark).presence || "Placemark #{idx + 1}",
+                "reason" => "missing_coordinates"
+              }
+              next
+            end
 
             node = build_point_node(placemark: placemark, index: idx, source_format: source_format, entry_name: entry_name)
             nodes << node
@@ -48,7 +56,15 @@ module Maps
           line_placemarks = placemarks.select { |item| geometry_type(item) == "linestring" }
           line_placemarks.each_with_index do |placemark, idx|
             line_coordinates = linestring_coordinates(placemark)
-            next if line_coordinates.size < 2
+            if line_coordinates.size < 2
+              adapter_warnings << {
+                "kind" => "cable_skipped",
+                "label" => placemark_name(placemark).presence || "LineString #{idx + 1}",
+                "reason" => "insufficient_coordinates",
+                "point_count" => line_coordinates.size
+              }
+              next
+            end
 
             source_node = ensure_endpoint_node!(
               coordinate_index: coordinate_index,
@@ -84,6 +100,7 @@ module Maps
             "schema_version" => SCHEMA_VERSION,
             "provider" => PROVIDER,
             "coordinate_system" => "geo",
+            "adapter_warnings" => adapter_warnings,
             "map" => {
               "name" => (document[:name] || document["name"]).to_s.strip.presence || DEFAULT_MAP_NAME,
               "external_id" => "kmz-map-#{raw_kml_sha.to_s[0, 16]}",

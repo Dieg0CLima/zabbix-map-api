@@ -40,6 +40,7 @@ module Maps
               finished_at: Time.current.iso8601,
               summary: result.summary,
               report: result.report,
+              warnings: Array(result.warnings),
               network_map_id: result.network_map&.id,
               network_map_name: result.network_map&.name
             }
