@@ -60,12 +60,12 @@ class NetworkMaps::CableMetricsPayloadBuilder
 
   def derive_zabbix_status(cable)
     status_item = cable.network_cable_items.find { |ci| ci.metric_role == "status" }
-    return nil unless status_item&.zabbix_item
+    return "unknown" unless status_item&.zabbix_item
 
     zi    = status_item.zabbix_item
     live  = (@live_values || {})[zi.itemid.to_s]
     value = (live&.dig("value") || zi.lastvalue).to_s.strip.downcase
-    return nil if value.blank?
+    return "unknown" if value.blank?
 
     # ifOperStatus: 1=up, 2=down, 3=testing, 4=unknown, 5=dormant, 6=notPresent, 7=lowerLayerDown.
     return "up" if %w[1 up].include?(value)

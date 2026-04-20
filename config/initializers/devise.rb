@@ -325,7 +325,7 @@ Devise.setup do |config|
       [ "DELETE", %r{^/api/v1/logout$} ]
     ]
 
-    jwt.expiration_time = 30.minutes.to_i
+    jwt.expiration_time = 4.hours.to_i
 
     jwt.request_formats = { user: [ :json ] }
     jwt.dispatch_requests = [ [ "POST", %r{^/api/v1/users/sign_in$} ] ]

@@ -1,6 +1,74 @@
 require "test_helper"
 
 class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
+  test "create accepts source_site_id and target_site_id through attached site nodes" do
+    organization = Organization.create!(name: "Org Cable Site API")
+    user = User.create!(email: "cable.site.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user:, organization:, role: "editor")
+
+    network_map = organization.network_maps.create!(name: "Mapa Cable Site API", source_type: "manual")
+    source_site = organization.sites.create!(name: "Site Origem", slug: "site-origem")
+    target_site = organization.sites.create!(name: "Site Destino", slug: "site-destino")
+    source_node = network_map.map_nodes.create!(
+      external_id: "site-node-origin",
+      label: "Site Origem",
+      node_kind: "generic",
+      x: -23.55,
+      y: -46.63,
+      lat: -23.55,
+      lng: -46.63,
+      mappable: source_site
+    )
+    target_node = network_map.map_nodes.create!(
+      external_id: "site-node-target",
+      label: "Site Destino",
+      node_kind: "generic",
+      x: -23.56,
+      y: -46.64,
+      lat: -23.56,
+      lng: -46.64,
+      mappable: target_site
+    )
+
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: user.email,
+        password: "Password!123",
+        organization_id: organization.id
+      }
+    }, as: :json
+
+    auth_header = response.headers["Authorization"]
+
+    post "/api/v1/network_maps/#{network_map.id}/network_cables", params: {
+      network_cable: {
+        source_site_id: source_site.id,
+        target_site_id: target_site.id,
+        cable_type: "feeder",
+        status: "active",
+        points: [
+          { position: 0, lat: -23.550001, lng: -46.630001 },
+          { position: 1, lat: -23.560001, lng: -46.640001 }
+        ]
+      },
+      organization_id: organization.id
+    }, headers: {
+      "Authorization" => auth_header
+    }, as: :json
+
+    assert_response :created
+
+    payload = response.parsed_body.fetch("data")
+    assert_equal source_site.id, payload["source_site_id"]
+    assert_equal target_site.id, payload["target_site_id"]
+    assert_equal source_node.external_id, payload["source_node_id"]
+    assert_equal target_node.external_id, payload["target_node_id"]
+
+    created_cable = network_map.network_cables.find(payload["id"])
+    assert_equal source_node.id, created_cable.source_node_id
+    assert_equal target_node.id, created_cable.target_node_id
+  end
+
   test "create accepts pop external ids, free end and returns ids plus ordered points" do
     organization = Organization.create!(name: "Org Cable API")
     user = User.create!(email: "cable.editor@example.com", password: "Password!123", password_confirmation: "Password!123")

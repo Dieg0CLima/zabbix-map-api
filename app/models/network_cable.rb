@@ -15,7 +15,10 @@ class NetworkCable < ApplicationRecord
   has_many :network_cable_events, dependent: :destroy
   has_many :network_cable_items, dependent: :destroy
 
+  attr_reader :source_site_id, :target_site_id
+
   before_validation :resolve_pop_external_ids
+  before_validation :resolve_site_endpoints
   before_validation :apply_default_visuals
   before_validation :derive_pops_from_nodes
 
@@ -39,6 +42,8 @@ class NetworkCable < ApplicationRecord
   validate :nodes_must_match_bound_pops
   validate :source_pop_external_id_must_exist
   validate :target_pop_external_id_must_exist
+  validate :source_site_must_exist_in_map
+  validate :target_site_must_exist_in_map
   validate :fiber_count_must_be_positive_integer
 
   def source_pop_id=(value)
@@ -61,6 +66,26 @@ class NetworkCable < ApplicationRecord
     end
 
     super(value)
+  end
+
+  def source_site_id=(value)
+    @source_site_id = normalize_site_id(value)
+  end
+
+  def target_site_id=(value)
+    @target_site_id = normalize_site_id(value)
+  end
+
+  def source_site_id
+    return @source_site_id if defined?(@source_site_id) && @source_site_id.present?
+
+    site_id_for_node(source_node)
+  end
+
+  def target_site_id
+    return @target_site_id if defined?(@target_site_id) && @target_site_id.present?
+
+    site_id_for_node(target_node)
   end
 
   private
@@ -86,9 +111,33 @@ class NetworkCable < ApplicationRecord
     end
   end
 
+  def resolve_site_endpoints
+    return if network_map.blank?
+
+    if @source_site_id.present?
+      self.source_node = network_map.map_nodes.find_by(mappable_type: "Site", mappable_id: @source_site_id)
+    end
+
+    if @target_site_id.present?
+      self.target_node = network_map.map_nodes.find_by(mappable_type: "Site", mappable_id: @target_site_id)
+    end
+  end
+
   def derive_pops_from_nodes
     self.source_pop ||= source_node&.map_pop
     self.target_pop ||= target_node&.map_pop
+  end
+
+  def source_site_must_exist_in_map
+    return if @source_site_id.blank? || source_node.present?
+
+    errors.add(:source_site_id, "must reference a Site marker attached to this map")
+  end
+
+  def target_site_must_exist_in_map
+    return if @target_site_id.blank? || target_node.present?
+
+    errors.add(:target_site_id, "must reference a Site marker attached to this map")
   end
 
   def source_binding_required
@@ -100,7 +149,7 @@ class NetworkCable < ApplicationRecord
   def endpoints_must_belong_to_the_same_map
     return if network_map.blank?
 
-    [source_pop, target_pop, source_node, target_node].compact.each do |record|
+    [ source_pop, target_pop, source_node, target_node ].compact.each do |record|
       next if record.network_map_id == network_map_id
 
       errors.add(:base, "all endpoints must belong to the same network map")
@@ -137,5 +186,17 @@ class NetworkCable < ApplicationRecord
     return if fiber_count.is_a?(Integer) && fiber_count.positive?
 
     errors.add(:metadata, "fiber_count deve ser inteiro positivo")
+  end
+
+  def normalize_site_id(value)
+    return nil if value.blank?
+
+    value.to_i
+  end
+
+  def site_id_for_node(node)
+    return nil unless node&.mappable_type == "Site"
+
+    node.mappable_id
   end
 end
