@@ -1,7 +1,20 @@
 class ApplicationController < ActionController::API
   include RackSessionsFix
+  after_action :refresh_jwt_session!
 
   private
+
+  def refresh_jwt_session!
+    return unless current_user.present?
+    return unless request.path.start_with?("/api/v1/")
+    return if request.path.in?([ "/api/v1/users/sign_in", "/api/v1/users/sign_out", "/api/v1/login", "/api/v1/logout" ])
+
+    scope = Devise::Mapping.find_scope!(current_user)
+    token, = Warden::JWTAuth::UserEncoder.new.call(current_user, scope, nil)
+    response.set_header("Authorization", "Bearer #{token}")
+  rescue StandardError => e
+    Rails.logger.debug("JWT refresh skipped: #{e.class}: #{e.message}")
+  end
 
   def current_organization
     @current_organization ||= begin

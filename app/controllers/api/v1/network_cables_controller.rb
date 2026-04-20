@@ -100,6 +100,8 @@ class Api::V1::NetworkCablesController < ApplicationController
       :target_pop_id,
       :source_node_id,
       :target_node_id,
+      :source_site_id,
+      :target_site_id,
       :source_element_id,
       :target_element_id,
       :label,

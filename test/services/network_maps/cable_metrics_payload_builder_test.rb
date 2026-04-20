@@ -82,6 +82,32 @@ class NetworkMaps::CableMetricsPayloadBuilderTest < ActiveSupport::TestCase
     assert_equal "unknown", cable_payload[:zabbix_status]
   end
 
+  test "returns unknown zabbix_status when cable has no status item" do
+    organization = Organization.create!(name: "Org Cable No Status #{SecureRandom.hex(4)}")
+    network_map = organization.network_maps.create!(
+      name: "Mapa No Status #{SecureRandom.hex(3)}",
+      source_type: "manual"
+    )
+    source_pop = network_map.map_pops.create!(
+      name: "POP No Status",
+      external_id: "pop-no-status-#{SecureRandom.hex(3)}",
+      lat: -23.10,
+      lng: -46.10,
+      color: "#7c3aed"
+    )
+
+    cable = network_map.network_cables.create!(
+      source_pop: source_pop,
+      label: "Cabo sem status",
+      status: "active"
+    )
+
+    payload = NetworkMaps::CableMetricsPayloadBuilder.new(network_map: network_map).call
+    cable_payload = payload[:cables].find { |entry| entry[:id] == cable.id }
+
+    assert_equal "unknown", cable_payload[:zabbix_status]
+  end
+
   private
 
   def build_map_with_status_item(lastvalue:)
@@ -122,6 +148,6 @@ class NetworkMaps::CableMetricsPayloadBuilderTest < ActiveSupport::TestCase
     )
 
     cable.network_cable_items.create!(zabbix_item: status_item, metric_role: "status")
-    [network_map, cable, status_item]
+    [ network_map, cable, status_item ]
   end
 end

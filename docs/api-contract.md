@@ -10,6 +10,8 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 - `DELETE /api/v1/users/sign_out` para logout.
 - `POST /api/v1/users` para cadastro.
 - enviar sempre `Authorization: Bearer <token>` nas chamadas autenticadas.
+- o token JWT expira em `4 horas` a partir do login.
+- a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
@@ -104,6 +106,14 @@ Comportamento visual no `editor_state`:
 - `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id/geometry`
 - `DELETE /api/v1/network_maps/:network_map_id/network_cables/:id`
 
+Criação/edição de endpoints do cabo aceita múltiplas formas de origem/destino:
+
+- `source_node_id` / `target_node_id`: nó explícito do mapa;
+- `source_pop_id` / `target_pop_id`: PoP do mapa;
+- `source_site_id` / `target_site_id`: Site anexado ao mapa (backend resolve automaticamente para o `MapNode` de `mappable_type = "Site"`).
+
+Quando `source_site_id` ou `target_site_id` for informado e o Site não estiver anexado ao mapa, a API retorna `422` com erro de validação.
+
 `PATCH .../geometry` aplica operações incrementais de edição de rota, sem sobrescrever todo o recurso de cabo:
 
 - `operation: "move_point"` requer `position` e `point` (`lat/lng` ou `x/y`).
@@ -173,7 +183,7 @@ Regras de estado operacional atuais:
 
 Thresholds padrão: `50/80/95` (baixo/moderado/alto), com override opcional em `network_cables.metadata.operational_thresholds`:
 
-`zabbix_status` no payload de cabo pode ser `up`, `down`, `degraded` ou `unknown` (com fallback para `null` quando não houver item de status associado).
+`zabbix_status` no payload de cabo pode ser `up`, `down`, `degraded` ou `unknown`. Quando não houver item de status associado ao cabo, o backend retorna `unknown`.
 
 ```json
 {
