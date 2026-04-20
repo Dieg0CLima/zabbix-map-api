@@ -13,7 +13,7 @@ RUN apt-get update -qq && \
       libpq5 \
       libvips \
       postgresql-client \
-      # ✅ runtime lib for mysql2 (client library)
+      unzip \
       libmariadb3 && \
     rm -rf /var/lib/apt/lists/*
 

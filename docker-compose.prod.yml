@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: zabbix_map_db
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zabbix-map-api:latest
+    container_name: zabbix_map_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: production
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+
+      # Banco de dados
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-zabbix_map_api_production}
+      DB_CACHE_NAME: ${DB_CACHE_NAME:-zabbix_map_api_production_cache}
+      DB_QUEUE_NAME: ${DB_QUEUE_NAME:-zabbix_map_api_production_queue}
+      DB_CABLE_NAME: ${DB_CABLE_NAME:-zabbix_map_api_production_cable}
+
+      # Segurança — gere com: rails secret
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      DEVISE_JWT_SECRET_KEY: ${DEVISE_JWT_SECRET_KEY}
+
+      # Active Record Encryption — gere com: rails db:encryption:init
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
+
+      # Tenancy
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      TENANCY_ORGANIZATION_ID: ${TENANCY_ORGANIZATION_ID:-}
+
+      # Seed inicial (deixe vazio após primeiro boot)
+      DB_RESET: ${DB_RESET:-false}
+      RUN_DB_SEED: ${RUN_DB_SEED:-true}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@zabbix-map.local}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD}
+      DEFAULT_ORG_ADMIN_EMAIL: ${DEFAULT_ORG_ADMIN_EMAIL:-org-admin@zabbix-map.local}
+      DEFAULT_ORG_ADMIN_PASSWORD: ${DEFAULT_ORG_ADMIN_PASSWORD}
+    ports:
+      - "${API_PORT:-80}:80"
+    restart: unless-stopped
+
+volumes:
+  pg_data:
