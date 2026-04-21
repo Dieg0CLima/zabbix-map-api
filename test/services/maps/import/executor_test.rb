@@ -191,10 +191,11 @@ class Maps::Import::ExecutorTest < ActiveSupport::TestCase
     assert_equal 1, organization.sites.where(name: "Site A").count
   end
 
-  test "apply does not raise when two non-endpoint nodes alias to the same site via name deduplication" do
+  test "apply creates independent sites for nodes with same name but different external_ids" do
     organization = Organization.create!(name: "Org Import SiteAlias #{SecureRandom.hex(3)}")
     payload = normalized_payload(name: "Mapa SiteAlias #{SecureRandom.hex(3)}")
-    # Both nodes have the same site_name → site_index maps both to the same Site record
+    # Both nodes share the same site_name but have different site_external_ids.
+    # Each should become its own independent Site — no name-based merging.
     payload["nodes"][0]["metadata"] = {
       "import_entity" => "site",
       "site_external_id" => "node-a",
@@ -218,13 +219,15 @@ class Maps::Import::ExecutorTest < ActiveSupport::TestCase
     node_a = map.map_nodes.find_by!(external_id: "node-a")
     node_b = map.map_nodes.find_by!(external_id: "node-b")
 
-    assert_equal 1, organization.sites.where(name: "Site Compartilhada").count
-    # Exactly one node holds the site; the other gets nil mappable
-    mapped_nodes = [node_a, node_b].select { |n| n.mappable_type == "Site" }
-    assert_equal 1, mapped_nodes.size, "exactly one node should claim the shared site"
+    # Two distinct sites — one per external_id
+    assert_equal 2, organization.sites.where(name: "Site Compartilhada").count
+    # Each node claims its own site
+    assert_equal "Site", node_a.mappable_type
+    assert_equal "Site", node_b.mappable_type
+    assert_not_equal node_a.mappable_id, node_b.mappable_id
   end
 
-  test "apply sanitizes equivalent site names and deduplicates batch mapping" do
+  test "apply sanitizes site name whitespace but keeps sites separate by external_id" do
     organization = Organization.create!(name: "Org Import Name Sanitization #{SecureRandom.hex(3)}")
     payload = normalized_payload(name: "Mapa Name Sanitization #{SecureRandom.hex(3)}")
     payload["nodes"][0]["metadata"] = {
@@ -248,8 +251,11 @@ class Maps::Import::ExecutorTest < ActiveSupport::TestCase
     node_a = map.map_nodes.find_by!(external_id: "node-a")
     node_b = map.map_nodes.find_by!(external_id: "node-b")
 
-    assert_equal 1, organization.sites.where(name: "Caixa de Abordagem Equinix SP4").count
-    assert_equal node_a.mappable_id, node_b.mappable_id
+    # Whitespace is normalized but each external_id still gets its own site
+    assert_equal 2, organization.sites.where(name: "Caixa de Abordagem Equinix SP4").count
+    assert_equal "Site", node_a.mappable_type
+    assert_equal "Site", node_b.mappable_type
+    assert_not_equal node_a.mappable_id, node_b.mappable_id
   end
 
   private
