@@ -88,7 +88,7 @@ module Maps
         )
 
         network_map.assign_attributes(
-          name: normalized_map_name,
+          name: network_map.persisted? ? network_map.name : normalized_map_name,
           source_type: network_map.source_type.presence || "manual",
           active_base_layer: network_map.active_base_layer.presence || "standard",
           metadata: metadata
