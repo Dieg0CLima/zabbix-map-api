@@ -18,6 +18,8 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists/*
 
 ENV RAILS_ENV=production \
+    RAILS_LOG_TO_STDOUT=true \
+    RAILS_SERVE_STATIC_FILES=true \
     BUNDLE_DEPLOYMENT=1 \
     BUNDLE_PATH=/usr/local/bundle \
     BUNDLE_WITHOUT="development:test"
@@ -56,7 +58,8 @@ COPY --from=build /rails /rails
 
 RUN groupadd --system --gid 1000 rails && \
     useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash rails && \
-    mkdir -p db log storage tmp && \
+    mkdir -p db log storage tmp tmp/pids tmp/cache tmp/sockets && \
+    chmod +x /rails/bin/docker-entrypoint /rails/bin/rails && \
     chown -R rails:rails db log storage tmp
 
 USER rails:rails
