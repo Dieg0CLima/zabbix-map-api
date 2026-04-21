@@ -50,6 +50,15 @@ module Maps
           message: "Import apply failed",
           details: { record: e.record.class.name, errors: e.record.errors.to_hash(true) }
         )
+      rescue ActiveRecord::RecordNotUnique => e
+        raise Maps::Import::Errors::DomainError.new(
+          code: "import_unique_conflict",
+          message: "Import apply failed due to unique constraint",
+          details: {
+            constraint: extract_unique_constraint(e.message),
+            message: e.message
+          }
+        )
       end
 
       private
@@ -94,6 +103,13 @@ module Maps
           metadata: metadata
         )
         network_map.save!
+      rescue ActiveRecord::RecordNotUnique
+        # Concurrent import created the same map name between resolve_target_map and save.
+        existing = @organization.network_maps.find_by(name: normalized_map_name)
+        raise unless existing
+
+        existing.update!(metadata: metadata)
+        @network_map = existing
       end
 
       def upsert_nodes!(network_map, site_index:, pop_index:)
@@ -232,6 +248,7 @@ module Maps
           {
             source_external_id: source_external_id,
             name: name,
+            name_key: site_name_key(name),
             lat: node_data["lat"],
             lng: node_data["lng"],
             source_node_external_id: node_data["external_id"]
@@ -241,35 +258,87 @@ module Maps
         return {} if candidates.empty?
 
         source_external_ids = candidates.map { |row| row[:source_external_id] }.uniq
+        name_keys = candidates.map { |row| row[:name_key] }.uniq
         existing_by_external_id = @organization.sites.where(external_id: source_external_ids).index_by(&:external_id)
+        existing_by_name_key = @organization.sites.each_with_object({}) do |site, acc|
+          key = site_name_key(site.name)
+          acc[key] ||= site if name_keys.include?(key)
+        end
 
-        rows = build_site_upsert_rows(candidates: candidates, existing_by_external_id: existing_by_external_id)
-        Site.upsert_all(rows, unique_by: :index_sites_on_organization_id_and_external_id)
+        result = build_site_upsert_rows(
+          candidates: candidates,
+          existing_by_external_id: existing_by_external_id,
+          existing_by_name_key: existing_by_name_key
+        )
+        rows = result[:rows]
+        alias_to_target_external_id = result[:alias_to_target_external_id]
 
-        persisted_by_external_id = @organization.sites.where(external_id: source_external_ids).index_by(&:external_id)
+        perform_site_upsert_with_retry!(
+          rows: rows,
+          candidates: candidates,
+          existing_by_external_id: existing_by_external_id
+        )
+
+        target_external_ids = rows.map { |row| row[:external_id] }.uniq
+        persisted_by_external_id = @organization.sites.where(external_id: target_external_ids).index_by(&:external_id)
+
+        site_index = persisted_by_external_id.dup
+        alias_to_target_external_id.each do |source_external_id, target_external_id|
+          site = persisted_by_external_id[target_external_id]
+          site_index[source_external_id] = site if site
+        end
 
         @site_summary = {
-          created: (source_external_ids - existing_by_external_id.keys).size,
-          reused: (source_external_ids & existing_by_external_id.keys).size,
-          deduplicated: 0
+          created: (rows.map { |r| r[:external_id] }.uniq - existing_by_external_id.keys).size,
+          reused: (rows.map { |r| r[:external_id] }.uniq & existing_by_external_id.keys).size,
+          deduplicated: alias_to_target_external_id.count { |source_id, target_id| source_id != target_id }
         }
 
-        persisted_by_external_id
+        site_index
       end
 
-      def build_site_upsert_rows(candidates:, existing_by_external_id:)
+      def build_site_upsert_rows(candidates:, existing_by_external_id:, existing_by_name_key:)
         now = Time.current
         rows_by_external_id = {}
+        alias_to_target_external_id = {}
+        target_external_id_by_name_key = {}
 
         candidates.each do |candidate|
-          external_id = candidate[:source_external_id]
-          existing = existing_by_external_id[external_id]
+          name = candidate[:name]
+          name_key = candidate[:name_key]
+          source_external_id = candidate[:source_external_id]
+          existing_by_name = existing_by_name_key[name_key]
+          existing_by_source = existing_by_external_id[source_external_id]
+          batch_target = target_external_id_by_name_key[name_key]
 
-          rows_by_external_id[external_id] = {
+          target_external_id = if existing_by_name.present?
+            existing_by_name.external_id
+          elsif batch_target.present?
+            batch_target
+          elsif existing_by_source.present?
+            existing_by_source.external_id
+          else
+            source_external_id
+          end
+
+          alias_to_target_external_id[source_external_id] = target_external_id
+          target_external_id_by_name_key[name_key] ||= target_external_id
+
+          if source_external_id != target_external_id
+            add_warning_once(
+              "kind" => "site_deduplicated",
+              "site_external_id" => source_external_id,
+              "merged_into_external_id" => target_external_id,
+              "label" => name,
+              "reason" => "duplicate_site_name"
+            )
+          end
+
+          rows_by_external_id[target_external_id] = {
             organization_id: @organization.id,
-            external_id: external_id,
-            name: candidate[:name],
-            slug: existing&.slug.presence || slug_for_site(candidate[:name], external_id),
+            external_id: target_external_id,
+            name: name,
+            slug: existing_by_name&.slug.presence || existing_by_source&.slug.presence || slug_for_site(name, target_external_id),
             lat: candidate[:lat],
             lng: candidate[:lng],
             status: "active",
@@ -284,7 +353,28 @@ module Maps
           }
         end
 
-        rows_by_external_id.values
+        {
+          rows: rows_by_external_id.values,
+          alias_to_target_external_id: alias_to_target_external_id
+        }
+      end
+
+      def perform_site_upsert_with_retry!(rows:, candidates:, existing_by_external_id:)
+        Site.upsert_all(rows, unique_by: :index_sites_on_organization_id_and_external_id)
+      rescue ActiveRecord::RecordNotUnique
+        # Concurrent import can create by name between read and upsert. Re-resolve by normalized name and retry once.
+        refreshed_by_name_key = @organization.sites.each_with_object({}) do |site, acc|
+          key = site_name_key(site.name)
+          acc[key] ||= site
+        end.slice(*candidates.map { |row| row[:name_key] }.uniq)
+
+        retried = build_site_upsert_rows(
+          candidates: candidates,
+          existing_by_external_id: existing_by_external_id,
+          existing_by_name_key: refreshed_by_name_key
+        )[:rows]
+
+        Site.upsert_all(retried, unique_by: :index_sites_on_organization_id_and_external_id)
       end
 
       def upsert_pops!(network_map, site_index)
@@ -356,6 +446,19 @@ module Maps
         return cleaned if cleaned.present?
 
         fallback_external_id.to_s
+      end
+
+      def add_warning_once(warning)
+        @warnings << warning unless @warnings.include?(warning)
+      end
+
+      def site_name_key(name)
+        sanitize_site_name(name, fallback_external_id: "site").downcase
+      end
+
+      def extract_unique_constraint(message)
+        match = message.to_s.match(/unique constraint "([^"]+)"/)
+        match&.captures&.first
       end
 
       def build_summary_for(network_map, map_action:)
