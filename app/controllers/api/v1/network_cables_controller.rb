@@ -125,6 +125,8 @@ class Api::V1::NetworkCablesController < ApplicationController
     params.require(:geometry).permit(
       :operation,
       :geometry_version,
+      :side,
+      :pop_id,
       :position,
       :after_position,
       :from_position,

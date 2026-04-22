@@ -153,7 +153,7 @@ module Maps
 
           external_id = ext["external_id"].presence || deterministic_id("node", index, name, coords)
           site_external_id = ext["site_external_id"].presence || (import_entity.in?(%w[site pop]) ? external_id : nil)
-          pop_external_id = ext["pop_external_id"].presence || (import_entity == "pop" ? external_id : nil)
+          pop_external_id = ext["pop_external_id"].presence || (import_entity.in?(%w[site pop]) ? external_id : nil)
 
           {
             "external_id" => external_id,

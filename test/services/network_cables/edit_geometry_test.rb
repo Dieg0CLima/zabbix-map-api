@@ -43,6 +43,47 @@ class NetworkCables::EditGeometryTest < ActiveSupport::TestCase
     assert_equal 2, error.details[:current_version]
   end
 
+  test "attach_endpoint_to_pop rebinds source endpoint and snaps first point" do
+    cable, network_map = build_cable_with_points(points: 3)
+    endpoint_node = network_map.map_nodes.create!(
+      external_id: "endpoint-node",
+      label: "Endpoint Node",
+      node_kind: "generic",
+      x: 0.0,
+      y: 0.0,
+      lat: 0.0,
+      lng: 0.0
+    )
+    destination_pop = network_map.map_pops.create!(
+      name: "POP Destino",
+      external_id: "pop-dest",
+      lat: -23.555,
+      lng: -46.666,
+      color: "#7c3aed"
+    )
+    cable.update!(source_node: endpoint_node, source_pop: nil)
+
+    updated = NetworkCables::EditGeometry.new(
+      cable: cable,
+      network_map: network_map,
+      payload: {
+        operation: "attach_endpoint_to_pop",
+        geometry_version: 0,
+        side: "source",
+        pop_id: destination_pop.external_id
+      },
+      actor_email: "editor@example.com"
+    ).call
+
+    first_point = updated.network_cable_points.order(:position).first
+
+    assert_equal destination_pop.id, updated.source_pop_id
+    assert_nil updated.source_node_id
+    assert_equal destination_pop.lat.to_f, first_point.x.to_f
+    assert_equal destination_pop.lng.to_f, first_point.y.to_f
+    assert_equal 1, updated.metadata["geometry_version"]
+  end
+
   private
 
   def build_cable_with_points(points:)

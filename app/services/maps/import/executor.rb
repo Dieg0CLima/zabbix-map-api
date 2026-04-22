@@ -381,7 +381,7 @@ module Maps
         candidates = @normalized_payload.fetch("nodes").filter_map do |node_data|
           metadata = safe_hash(node_data["metadata"])
           next if generated_endpoint?(metadata)
-          next unless metadata["import_entity"].to_s == "pop"
+          next unless metadata["import_entity"].to_s.in?(%w[site pop])
 
           external_id = resolve_pop_external_id(node_data, metadata)
           next if external_id.blank?

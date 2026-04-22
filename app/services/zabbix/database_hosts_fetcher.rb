@@ -21,7 +21,7 @@ module Zabbix
         else
           statement = client.prepare(mysql_sql)
           begin
-            statement.execute(search_term, search_term, search_term, @limit).to_a
+            statement.execute(search_term_lower, search_term_lower, search_term, @limit).to_a
           ensure
             statement&.close
           end
@@ -65,7 +65,7 @@ module Zabbix
           CAST(h.status AS CHAR) AS status
         FROM hosts h
         WHERE h.status <> 3
-          AND (h.name LIKE ? OR h.host LIKE ? OR CAST(h.hostid AS CHAR) LIKE ?)
+          AND (LOWER(h.name) LIKE ? OR LOWER(h.host) LIKE ? OR CAST(h.hostid AS CHAR) LIKE ?)
         ORDER BY h.name_upper, h.name, h.hostid
         LIMIT ?
       SQL
@@ -84,6 +84,12 @@ module Zabbix
       return "%" if @search.blank?
 
       "%#{@search}%"
+    end
+
+    def search_term_lower
+      return "%" if @search.blank?
+
+      "%#{@search.downcase}%"
     end
 
     def normalize_limit(limit)

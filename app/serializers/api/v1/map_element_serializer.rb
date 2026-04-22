@@ -19,6 +19,8 @@ class Api::V1::MapElementSerializer
       y: @map_node.y,
       lat: @map_node.lat,
       lng: @map_node.lng,
+      pop_id: @map_node.map_pop&.external_id,
+      map_pop_id: @map_node.map_pop_id,
       width: @map_node.width,
       height: @map_node.height,
       color_override: resolved_color_override,

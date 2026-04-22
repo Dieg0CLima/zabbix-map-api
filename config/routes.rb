@@ -77,6 +77,7 @@ Rails.application.routes.draw do
           resources :network_cable_items, only: %i[index create destroy]
         end
 
+        resources :map_pops, controller: "map_pops"
         resources :edges, controller: "map_edges", param: :id, only: %i[index create update destroy]
         resources :site_markers, controller: "site_markers", only: %i[create update destroy] do
           collection do

@@ -128,6 +128,7 @@ Payload de criação (`POST`):
 Comportamento visual no `editor_state`:
 
 - quando o `site` tiver item ICMP vinculado e o valor mais recente indicar disponibilidade (`1`, `up`, `true`, `ok`, etc.), o elemento do site volta com `color_override` forçado para `#00c853` (destaque visual de site online);
+- cada `element` de site agora também retorna `pop_id` (`external_id` do POP) e `map_pop_id` (id interno), permitindo snap de vértice no frontend para vínculo rápido de endpoint de cabo ao POP correto;
 - o payload de cada `element` de site inclui `monitoring_ping.status` com `up`, `down` ou `unknown`, usando regra consolidada:
   - `icmpping <= 0` => `down`
   - `icmpping > 0` e `icmppingloss >= 100` => `down`
@@ -160,6 +161,10 @@ Quando `source_site_id` ou `target_site_id` for informado e o Site não estiver 
 - `operation: "insert_point"` requer `after_position` e `points`.
 - `operation: "remove_point"` requer `position`.
 - `operation: "replace_all"` requer `points`.
+- `operation: "attach_endpoint_to_pop"` requer `side` (`source|target`) e `pop_id` (id numérico ou `external_id`):
+  - reancora o endpoint do cabo no POP informado;
+  - ajusta automaticamente o primeiro (`source`) ou último (`target`) ponto da geometria para `lat/lng` do POP;
+  - limpa o vínculo de `source_node_id`/`target_node_id` do lado editado para evitar conflito com `source_pop_id`/`target_pop_id` em cabos importados.
 
 Opcionalmente, envie `geometry_version` para controle de concorrência otimista. Em caso de conflito, a API retorna `409` com código `geometry_conflict` e os campos `expected_version` e `current_version`.
 

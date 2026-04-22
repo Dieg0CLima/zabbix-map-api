@@ -9,6 +9,7 @@ class NetworkCables::EditGeometry
 
   def call
     previous_state = NetworkCables::EventStateBuilder.call(cable: @cable)
+    @endpoint_binding_updates = {}
 
     ActiveRecord::Base.transaction do
       ensure_geometry_version!
@@ -18,6 +19,7 @@ class NetworkCables::EditGeometry
       validate_points!(updated_points)
 
       replace_points!(updated_points)
+      apply_endpoint_binding_updates!
       bump_geometry_version!
       @cable.reload
 
@@ -64,6 +66,10 @@ class NetworkCables::EditGeometry
       remove_point(points)
     when "remove_segment"
       remove_segment(points)
+    when "attach_endpoint_to_pop"
+      attach_endpoint_to_pop(points)
+    when "attach_endpoint_to_node"
+      attach_endpoint_to_node(points)
     else
       raise NetworkCables::Errors::InvalidGeometryOperation.new(
         operation: operation,
@@ -130,6 +136,44 @@ class NetworkCables::EditGeometry
     normalize_positions(updated)
   end
 
+  def attach_endpoint_to_pop(points)
+    side = @payload[:side].to_s
+    unless %w[source target].include?(side)
+      raise_invalid_operation!("invalid_side", side: side)
+    end
+
+    pop_id = @payload[:pop_id]
+    pop = resolve_pop(pop_id)
+    raise_invalid_operation!("pop_not_found", pop_id: pop_id) if pop.nil?
+
+    updated = points.map(&:dup)
+    endpoint_point = side == "source" ? updated.first : updated.last
+    endpoint_point[:x] = pop.lat
+    endpoint_point[:y] = pop.lng
+
+    register_endpoint_binding(side: side, pop: pop)
+    normalize_positions(updated)
+  end
+
+  def attach_endpoint_to_node(points)
+    side = @payload[:side].to_s
+    unless %w[source target].include?(side)
+      raise_invalid_operation!("invalid_side", side: side)
+    end
+
+    node_id = @payload[:node_id]
+    node = resolve_node(node_id)
+    raise_invalid_operation!("node_not_found", node_id: node_id) if node.nil?
+
+    updated = points.map(&:dup)
+    endpoint_point = side == "source" ? updated.first : updated.last
+    endpoint_point[:x] = node.lat
+    endpoint_point[:y] = node.lng
+
+    register_node_endpoint_binding(side: side, node: node)
+    normalize_positions(updated)
+  end
+
   def validate_points!(points)
     NetworkCables::PointSetValidator.validate!(points)
   end
@@ -137,6 +181,13 @@ class NetworkCables::EditGeometry
   def replace_points!(points)
     @cable.network_cable_points.destroy_all
     points.each { |point| @cable.network_cable_points.create!(point.slice(:position, :x, :y)) }
+  end
+
+  def apply_endpoint_binding_updates!
+    return if @endpoint_binding_updates.blank?
+
+    @cable.assign_attributes(@endpoint_binding_updates)
+    @cable.save!
   end
 
   def normalize_positions(points)
@@ -187,5 +238,67 @@ class NetworkCables::EditGeometry
       operation: @payload[:operation].to_s,
       details: extra.merge(reason: reason)
     )
+  end
+
+  def resolve_pop(value)
+    return nil if value.blank?
+
+    scope = @cable.network_map.map_pops
+    string_value = value.to_s
+    return scope.find_by(id: string_value.to_i) if string_value.match?(/\A\d+\z/)
+
+    scope.find_by(external_id: string_value)
+  end
+
+  def resolve_node(value)
+    return nil if value.blank?
+
+    scope = @cable.network_map.map_nodes
+    string_value = value.to_s
+    return scope.find_by(id: string_value.to_i) if string_value.match?(/\A\d+\z/)
+
+    scope.find_by(external_id: string_value)
+  end
+
+  def register_node_endpoint_binding(side:, node:)
+    updates =
+      if side == "source"
+        {
+          source_node_id: node.id,
+          source_pop_id: nil,
+          source_site_id: nil,
+          source_element_id: nil
+        }
+      else
+        {
+          target_node_id: node.id,
+          target_pop_id: nil,
+          target_site_id: nil,
+          target_element_id: nil
+        }
+      end
+
+    @endpoint_binding_updates.merge!(updates)
+  end
+
+  def register_endpoint_binding(side:, pop:)
+    updates =
+      if side == "source"
+        {
+          source_pop_id: pop.external_id,
+          source_node_id: nil,
+          source_site_id: nil,
+          source_element_id: nil
+        }
+      else
+        {
+          target_pop_id: pop.external_id,
+          target_node_id: nil,
+          target_site_id: nil,
+          target_element_id: nil
+        }
+      end
+
+    @endpoint_binding_updates.merge!(updates)
   end
 end
