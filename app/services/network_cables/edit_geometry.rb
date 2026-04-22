@@ -68,6 +68,8 @@ class NetworkCables::EditGeometry
       remove_segment(points)
     when "attach_endpoint_to_pop"
       attach_endpoint_to_pop(points)
+    when "attach_endpoint_to_site"
+      attach_endpoint_to_site(points)
     when "attach_endpoint_to_node"
       attach_endpoint_to_node(points)
     else
@@ -174,6 +176,28 @@ class NetworkCables::EditGeometry
     normalize_positions(updated)
   end
 
+  def attach_endpoint_to_site(points)
+    side = @payload[:side].to_s
+    unless %w[source target].include?(side)
+      raise_invalid_operation!("invalid_side", side: side)
+    end
+
+    site_id = @payload[:site_id]
+    site = resolve_site(site_id)
+    raise_invalid_operation!("site_not_found", site_id: site_id) if site.nil?
+
+    node = resolve_site_node(site.id)
+    raise_invalid_operation!("site_node_not_found", site_id: site.id) if node.nil?
+
+    updated = points.map(&:dup)
+    endpoint_point = side == "source" ? updated.first : updated.last
+    endpoint_point[:x] = node.lat
+    endpoint_point[:y] = node.lng
+
+    register_site_endpoint_binding(side: side, site: site)
+    normalize_positions(updated)
+  end
+
   def validate_points!(points)
     NetworkCables::PointSetValidator.validate!(points)
   end
@@ -260,6 +284,20 @@ class NetworkCables::EditGeometry
     scope.find_by(external_id: string_value)
   end
 
+  def resolve_site(value)
+    return nil if value.blank?
+
+    scope = @cable.network_map.organization.sites
+    string_value = value.to_s
+    return scope.find_by(id: string_value.to_i) if string_value.match?(/\A\d+\z/)
+
+    nil
+  end
+
+  def resolve_site_node(site_id)
+    @cable.network_map.map_nodes.find_by(mappable_type: "Site", mappable_id: site_id)
+  end
+
   def register_node_endpoint_binding(side:, node:)
     updates =
       if side == "source"
@@ -295,6 +333,27 @@ class NetworkCables::EditGeometry
           target_pop_id: pop.external_id,
           target_node_id: nil,
           target_site_id: nil,
+          target_element_id: nil
+        }
+      end
+
+    @endpoint_binding_updates.merge!(updates)
+  end
+
+  def register_site_endpoint_binding(side:, site:)
+    updates =
+      if side == "source"
+        {
+          source_site_id: site.id,
+          source_pop_id: nil,
+          source_node_id: nil,
+          source_element_id: nil
+        }
+      else
+        {
+          target_site_id: site.id,
+          target_pop_id: nil,
+          target_node_id: nil,
           target_element_id: nil
         }
       end

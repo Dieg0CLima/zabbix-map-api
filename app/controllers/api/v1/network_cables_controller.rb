@@ -127,6 +127,7 @@ class Api::V1::NetworkCablesController < ApplicationController
       :geometry_version,
       :side,
       :pop_id,
+      :site_id,
       :position,
       :after_position,
       :from_position,
