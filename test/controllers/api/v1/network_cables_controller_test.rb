@@ -226,4 +226,56 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     assert_response :conflict
     assert_equal "geometry_conflict", response.parsed_body["code"]
   end
+
+  test "geometry attach_endpoint_to_pop rebinds endpoint and snaps terminal point" do
+    organization = Organization.create!(name: "Org Cable Geometry Bind Pop")
+    user = User.create!(email: "cable.geometry.bind.pop@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user:, organization:, role: "editor")
+
+    network_map = organization.network_maps.create!(name: "Mapa Cable Geometry Bind Pop", source_type: "manual")
+    source_endpoint = network_map.map_nodes.create!(
+      external_id: "kmz-endpoint-source",
+      label: "KMZ Endpoint Source",
+      node_kind: "generic",
+      x: -23.5001,
+      y: -46.6001,
+      lat: -23.5001,
+      lng: -46.6001
+    )
+    cable = network_map.network_cables.create!(source_node: source_endpoint, status: "planned", label: "Fibra C")
+    2.times { |index| cable.network_cable_points.create!(position: index, x: -23.5 + index, y: -46.6 + index) }
+    source_pop = network_map.map_pops.create!(name: "POP Vinculo", external_id: "pop-bind", lat: -23.777, lng: -46.888, color: "#7c3aed")
+
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: user.email,
+        password: "Password!123",
+        organization_id: organization.id
+      }
+    }, as: :json
+
+    auth_header = response.headers["Authorization"]
+
+    patch "/api/v1/network_maps/#{network_map.id}/network_cables/#{cable.id}/geometry", params: {
+      geometry: {
+        operation: "attach_endpoint_to_pop",
+        geometry_version: 0,
+        side: "source",
+        pop_id: source_pop.external_id
+      },
+      organization_id: organization.id
+    }, headers: {
+      "Authorization" => auth_header
+    }, as: :json
+
+    assert_response :ok
+    payload = response.parsed_body.fetch("data")
+    first_point = payload.fetch("points").min_by { |point| point.fetch("position") }
+
+    assert_equal source_pop.external_id, payload["source_pop_id"]
+    assert_nil payload["source_node_id"]
+    assert_equal source_pop.lat.to_f, first_point["lat"].to_f
+    assert_equal source_pop.lng.to_f, first_point["lng"].to_f
+    assert_equal 1, payload["geometry_version"]
+  end
 end

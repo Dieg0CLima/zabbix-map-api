@@ -92,6 +92,7 @@ class Maps::Import::Providers::KmzAdapterTest < ActiveSupport::TestCase
 
     assert_equal "site", node.dig("metadata", "import_entity")
     assert_equal node["external_id"], node.dig("metadata", "site_external_id")
+    assert_equal node["external_id"], node.dig("metadata", "pop_external_id")
   end
 
   test "parses kmz upload and normalizes into canonical contract" do

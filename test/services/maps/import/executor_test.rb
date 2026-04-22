@@ -66,10 +66,13 @@ class Maps::Import::ExecutorTest < ActiveSupport::TestCase
   test "apply imports sites and pops from node metadata and binds map nodes" do
     organization = Organization.create!(name: "Org Import Site Pop #{SecureRandom.hex(3)}")
     payload = normalized_payload(name: "Mapa Site Pop #{SecureRandom.hex(3)}")
+    # site entity — every site also becomes a MapPop (POP == Site)
     payload["nodes"][0]["metadata"] = {
       "import_entity" => "site",
       "site_external_id" => "site-a",
-      "site_name" => "Site A"
+      "site_name" => "Site A",
+      "pop_external_id" => "pop-a",
+      "pop_name" => "POP A"
     }
     payload["nodes"][1]["metadata"] = {
       "import_entity" => "pop",
@@ -88,18 +91,51 @@ class Maps::Import::ExecutorTest < ActiveSupport::TestCase
     map = result.network_map
     site_a = organization.sites.find_by!(external_id: "site-a")
     site_b = organization.sites.find_by!(external_id: "site-b")
+    pop_a = map.map_pops.find_by!(external_id: "pop-a")
     pop_b = map.map_pops.find_by!(external_id: "pop-b")
     node_a = map.map_nodes.find_by!(external_id: "node-a")
     node_b = map.map_nodes.find_by!(external_id: "node-b")
 
     assert_equal "Site A", site_a.name
     assert_equal "Site B", site_b.name
+    assert_equal site_a.id, pop_a.site_id
     assert_equal site_b.id, pop_b.site_id
     assert_equal "Site", node_a.mappable_type
     assert_equal site_a.id, node_a.mappable_id
+    assert_equal pop_a.id, node_a.map_pop_id
     assert_equal "Site", node_b.mappable_type
     assert_equal site_b.id, node_b.mappable_id
     assert_equal pop_b.id, node_b.map_pop_id
+  end
+
+  test "apply creates a MapPop for every site entity" do
+    organization = Organization.create!(name: "Org Import Site As Pop #{SecureRandom.hex(3)}")
+    payload = normalized_payload(name: "Mapa Site As Pop #{SecureRandom.hex(3)}")
+    payload["nodes"][0]["metadata"] = {
+      "import_entity" => "site",
+      "site_external_id" => "site-a",
+      "site_name" => "Site A"
+    }
+    payload["nodes"][1]["metadata"] = {
+      "import_entity" => "site",
+      "site_external_id" => "site-b",
+      "site_name" => "Site B"
+    }
+
+    result = Maps::Import::Executor.new(
+      organization: organization,
+      normalized_payload: payload,
+      mode: "apply"
+    ).call
+
+    map = result.network_map
+    # Every site node must produce a MapPop linked to its Site
+    assert_equal 2, map.map_pops.count
+    node_a = map.map_nodes.find_by!(external_id: "node-a")
+    node_b = map.map_nodes.find_by!(external_id: "node-b")
+    assert_not_nil node_a.map_pop_id
+    assert_not_nil node_b.map_pop_id
+    assert_not_equal node_a.map_pop_id, node_b.map_pop_id
   end
 
   test "apply reuses existing site with same name to avoid unique violation on organization name index" do

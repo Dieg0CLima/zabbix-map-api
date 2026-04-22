@@ -6,9 +6,10 @@ class Api::V1::NetworkMapEditorStateV2ControllerTest < ActionDispatch::Integrati
     @organization = Organization.create!(name: "Org Editor", slug: "org-editor")
     Membership.create!(user: @user, organization: @organization, role: "admin")
     @network_map = NetworkMap.create!(organization: @organization, name: "Editor Map")
+    @map_pop = @network_map.map_pops.create!(name: "POP A", external_id: "pop-a", lat: 1, lng: 1)
     @site = Site.create!(organization: @organization, name: "Site A", slug: "site-a")
     @device = Device.create!(organization: @organization, site: @site, name: "SW-01", role: "switch", status: "active")
-    @network_map.map_nodes.create!(mappable: @site, label: @site.name, node_kind: "gateway", x: 1, y: 1, lat: 1, lng: 1, icon: "pi-building", color: "#111111", size: 30)
+    @network_map.map_nodes.create!(mappable: @site, map_pop: @map_pop, label: @site.name, node_kind: "gateway", x: 1, y: 1, lat: 1, lng: 1, icon: "pi-building", color: "#111111", size: 30)
     @network_map.map_nodes.create!(mappable: @device, label: @device.name, node_kind: "switch", x: 2, y: 2, lat: 2, lng: 2, icon: "pi-box", color: "#222222", size: 30)
 
     post "/api/v1/users/sign_in", params: { user: { email: @user.email, password: "password", organization_id: @organization.id } }
@@ -22,6 +23,8 @@ class Api::V1::NetworkMapEditorStateV2ControllerTest < ActionDispatch::Integrati
     body = JSON.parse(response.body)
     assert_equal 1, body.dig("data", "elements").size
     assert_equal "Site", body.dig("data", "elements", 0, "mappable_type")
+    assert_equal "pop-a", body.dig("data", "elements", 0, "pop_id")
+    assert_equal @map_pop.id, body.dig("data", "elements", 0, "map_pop_id")
     assert_equal 1, body.dig("data", "devices").size
     assert_equal 1, body.dig("data", "sites").size
   end
