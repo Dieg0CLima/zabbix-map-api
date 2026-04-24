@@ -1,4 +1,23 @@
 class NetworkMaps::CableMetricsPayloadBuilder
+  TELEMETRY_METRIC_ROLES = %w[
+    bandwidth_in
+    bandwidth_out
+    error_in
+    error_out
+    crc_in
+    crc_out
+  ].freeze
+
+  IF_OPER_STATUS_MAP = {
+    1 => "up",
+    2 => "down",
+    3 => "degraded",
+    4 => "unknown",
+    5 => "degraded",
+    6 => "unknown",
+    7 => "degraded"
+  }.freeze
+
   def initialize(network_map:)
     @network_map = network_map
   end
@@ -14,7 +33,13 @@ class NetworkMaps::CableMetricsPayloadBuilder
 
   def cable_metrics
     cables = @network_map.network_cables
-                         .includes(network_cable_items: { zabbix_item: :zabbix_connection })
+                         .includes(
+                           :source_node,
+                           :target_node,
+                           { source_node: :zabbix_host },
+                           { target_node: :zabbix_host },
+                           { network_cable_items: { zabbix_item: :zabbix_connection } }
+                         )
                          .order(:id)
 
     all_zabbix_items = cables.flat_map { |c| c.network_cable_items.filter_map(&:zabbix_item) }
@@ -30,6 +55,13 @@ class NetworkMaps::CableMetricsPayloadBuilder
       live_values: @live_values,
       zabbix_status: zabbix_status
     ).call
+    visual = NetworkCables::OperationalVisualProfile.new(
+      cable_status: cable.status,
+      zabbix_status: zabbix_status,
+      operational_state: operational[:operational_state],
+      traffic_level: operational[:traffic_level],
+      alert_level: operational[:alert_level]
+    ).call
 
     {
       id: cable.id,
@@ -40,6 +72,7 @@ class NetworkMaps::CableMetricsPayloadBuilder
       operational_state: operational[:operational_state],
       traffic_level: operational[:traffic_level],
       alert_level: operational[:alert_level],
+      visual: visual,
       operational_details: {
         upload_bps: operational[:upload_bps],
         download_bps: operational[:download_bps],
@@ -59,21 +92,96 @@ class NetworkMaps::CableMetricsPayloadBuilder
   end
 
   def derive_zabbix_status(cable)
+    endpoint_status = endpoint_zabbix_status(cable)
+
     status_item = cable.network_cable_items.find { |ci| ci.metric_role == "status" }
-    return "unknown" unless status_item&.zabbix_item
+    return telemetry_presence_status(cable) || endpoint_status unless status_item&.zabbix_item
 
     zi    = status_item.zabbix_item
     live  = (@live_values || {})[zi.itemid.to_s]
-    value = (live&.dig("value") || zi.lastvalue).to_s.strip.downcase
-    return "unknown" if value.blank?
+    raw_value = live&.dig("value") || zi.lastvalue
+    value = raw_value.to_s.strip.downcase
+    return telemetry_presence_status(cable) || endpoint_status if value.blank?
 
-    # ifOperStatus: 1=up, 2=down, 3=testing, 4=unknown, 5=dormant, 6=notPresent, 7=lowerLayerDown.
-    return "up" if %w[1 up].include?(value)
-    return "down" if %w[2 down].include?(value)
-    return "degraded" if %w[3 5 7 testing dormant lowerlayerdown lower_layer_down].include?(value)
-    return "unknown" if %w[4 6 unknown notpresent not_present unavailable].include?(value)
+    code = parse_if_oper_status_code(value)
+    if code
+      mapped = IF_OPER_STATUS_MAP.fetch(code)
+      return mapped unless mapped == "unknown"
+    end
+
+    return "up" if value.match?(/\bup\b/)
+    return "down" if value.match?(/\bdown\b/)
+    return "degraded" if value.in?(%w[testing dormant lowerlayerdown lower_layer_down])
+    if value.in?(%w[unknown notpresent not_present unavailable])
+      return telemetry_presence_status(cable) || endpoint_status
+    end
+
+    telemetry_presence_status(cable) || endpoint_status
+  end
+
+  def parse_if_oper_status_code(value)
+    numeric = Float(value)
+    return nil unless numeric.finite?
+
+    code = numeric.to_i
+    return nil unless numeric == code
+    return nil unless IF_OPER_STATUS_MAP.key?(code)
+
+    code
+  rescue ArgumentError, TypeError
+    if (match = value.match(/\A(\d+)/))
+      code = match[1].to_i
+      return code if IF_OPER_STATUS_MAP.key?(code)
+    end
+
+    nil
+  end
+
+  def endpoint_zabbix_status(cable)
+    statuses = [ cable.source_node, cable.target_node ]
+               .compact
+               .map { |node| host_status_label(node.zabbix_host) }
+               .compact
+
+    return "unknown" if statuses.empty?
+    return "down" if statuses.include?("down")
+    return "degraded" if statuses.include?("degraded")
+    return "up" if statuses.include?("up")
 
     "unknown"
+  end
+
+  def telemetry_presence_status(cable)
+    telemetry_items = cable.network_cable_items.select do |cable_item|
+      cable_item.zabbix_item_id.present? && TELEMETRY_METRIC_ROLES.include?(cable_item.metric_role)
+    end
+    return nil if telemetry_items.empty?
+
+    has_signal = telemetry_items.any? do |cable_item|
+      zabbix_item = cable_item.zabbix_item
+      next false unless zabbix_item
+
+      live = (@live_values || {})[zabbix_item.itemid.to_s]
+      value = live&.dig("value") || zabbix_item.lastvalue
+      clock = live&.dig("clock") || zabbix_item.lastclock
+      value.to_s.strip.present? || clock.to_s.strip.present?
+    end
+
+    has_signal ? "up" : nil
+  end
+
+  def host_status_label(host)
+    return nil unless host
+    return "down" if host.status.to_s == "1" || host.status.to_s.casecmp("disabled").zero?
+
+    host_available?(host) ? "up" : "degraded"
+  end
+
+  def host_available?(host)
+    value = host.available
+    return value if value == true || value == false
+
+    value.to_s.strip.downcase.in?(%w[1 true up available enabled])
   end
 
   def build_item(cable_item)

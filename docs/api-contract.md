@@ -194,6 +194,15 @@ No payload de `cable_metrics` (via `MapChannel` em `initial` e `refresh`), cada 
   "operational_state": "traffic_high",
   "traffic_level": "high",
   "alert_level": "warning",
+  "visual": {
+    "cable_color": "#d97706",
+    "indicator_color": "#d97706",
+    "status_color": "#059669",
+    "alert_color": "#d97706",
+    "traffic_color": "#d97706",
+    "indicator_severity": "warn",
+    "state_label": "Tráfego alto"
+  },
   "operational_details": {
     "upload_bps": 22000000.0,
     "download_bps": 81000000.0,
@@ -216,6 +225,18 @@ No payload de `cable_metrics` (via `MapChannel` em `initial` e `refresh`), cada 
 }
 ```
 
+`visual` é um bloco aditivo para consumo direto dos indicadores do frontend:
+
+- `cable_color`: cor final recomendada para renderização da linha do cabo (prioridade: no-traffic -> alerta warning/critical -> status Zabbix -> status cadastral do cabo);
+- `indicator_color`: alias de `cable_color` para badges/chips de indicador;
+- `status_color`: cor semântica pura de `zabbix_status` (`up/down/degraded/unknown`);
+- `alert_color`: cor semântica pura de `alert_level` (`ok/warning/critical/unknown`);
+- `traffic_color`: cor semântica pura de `traffic_level` (`none/low/moderate/high/saturated`);
+- `indicator_severity`: token semântico (`success|warn|danger|secondary`) para componentes de UI;
+- `state_label`: label amigável derivada de `operational_state`.
+
+Regra visual adicional: quando o cabo estiver em estado sem tráfego (`up_no_traffic`/`no_traffic` ou `traffic_level=none`), `cable_color`/`indicator_color` devem ser `#000000` (preto).
+
 Regras de estado operacional atuais:
 
 - `port_down`: item de `status` indica porta down (`2`/`down`);
@@ -227,7 +248,9 @@ Regras de estado operacional atuais:
 
 Thresholds padrão: `50/80/95` (baixo/moderado/alto), com override opcional em `network_cables.metadata.operational_thresholds`:
 
-`zabbix_status` no payload de cabo pode ser `up`, `down`, `degraded` ou `unknown`. Quando não houver item de status associado ao cabo, o backend retorna `unknown`.
+`zabbix_status` no payload de cabo pode ser `up`, `down`, `degraded` ou `unknown`. Quando não houver item de status associado ao cabo, o backend usa fallback pelos hosts dos nós de origem/destino (prioridade `down > degraded > up`); retorna `unknown` apenas quando não há sinal de status no item nem nos endpoints.
+O parser de `ifOperStatus` aceita valores numéricos inteiros e decimais equivalentes (ex.: `1`, `1.0`, `2.0`, `7.0`) além de aliases textuais (`up`, `down`, `testing`, `dormant`, `lowerLayerDown`, `notPresent`, `unavailable`).
+Quando `ifOperStatus` não estiver disponível/confiável e os endpoints também não fornecerem estado, o backend faz fallback por telemetria de cabo (`bandwidth_in|bandwidth_out|error_in|error_out|crc_in|crc_out`): se houver sinal (`lastvalue`/`lastclock`) em qualquer item desses papéis, o status derivado passa para `up`.
 
 ```json
 {
