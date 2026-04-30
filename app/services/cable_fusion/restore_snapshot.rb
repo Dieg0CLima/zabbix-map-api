@@ -16,6 +16,13 @@ module CableFusion
         actor: @actor
       ).call
 
+      CableFusion::CreateSnapshot.new(
+        diagram: diagram,
+        actor: @actor,
+        reason: "restore_from_snapshot:#{@snapshot.id}",
+        published: false
+      ).call
+
       [ diagram, validation ]
     end
 

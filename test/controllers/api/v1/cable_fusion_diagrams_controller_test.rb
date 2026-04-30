@@ -118,6 +118,55 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
     assert_equal true, snapshots.first["published"]
   end
 
+  test "publish is idempotent when structure has not changed" do
+    put "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram", params: {
+      organization_id: @organization.id,
+      fusion_diagram: {
+        nodes: [ { client_id: "node-1", type: "dio", label: "DIO A", x: 10, y: 20, rotation: 0 } ],
+        ports: [
+          { client_id: "port-in", node_client_id: "node-1", name: "IN-01", port_type: "fiber_in", capacity: 1, occupancy_limit: 1 },
+          { client_id: "port-out", node_client_id: "node-1", name: "OUT-01", port_type: "fiber_out", capacity: 1, occupancy_limit: 1 }
+        ],
+        links: [ { client_id: "link-1", source_port_client_id: "port-in", target_port_client_id: "port-out", link_kind: "splice", fiber_side: "a", fiber_number: 1 } ]
+      }
+    }, headers: auth_headers, as: :json
+    assert_response :ok
+
+    post "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/publish", params: {
+      organization_id: @organization.id
+    }, headers: auth_headers, as: :json
+    assert_response :ok
+    first = response.parsed_body.fetch("data")
+
+    post "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/publish", params: {
+      organization_id: @organization.id
+    }, headers: auth_headers, as: :json
+    assert_response :ok
+    second = response.parsed_body.fetch("data")
+
+    assert_equal first["version"], second["version"]
+
+    get "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/snapshots", params: {
+      organization_id: @organization.id
+    }, headers: auth_headers, as: :json
+    assert_response :ok
+    assert_equal 1, response.parsed_body.fetch("data").size
+  end
+
+  test "publish is blocked when diagram is empty" do
+    post "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/publish", params: {
+      organization_id: @organization.id,
+      reason: "empty should fail"
+    }, headers: auth_headers, as: :json
+
+    assert_response :ok
+    data = response.parsed_body.fetch("data")
+    assert_equal false, data.dig("validation", "is_valid")
+    errors = data.dig("validation", "errors")
+    assert_includes errors.map { |e| e["code"] }, "publish_diagram_empty"
+    assert_includes errors.map { |e| e["path"] }, "nodes"
+  end
+
   test "restore snapshot rewrites draft from selected version" do
     diagram = CableFusion::LoadDiagram.new(cable: @cable).call
     node = diagram.nodes.create!(node_type: "dio", label: "Original", x: 1, y: 1, rotation: 0)
@@ -126,6 +175,7 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
     diagram.links.create!(source_port: p1, target_port: p2, link_kind: "splice", status: "draft")
     diagram.update!(version: 1)
     snapshot = CableFusion::CreateSnapshot.new(diagram:, actor: @user, reason: "baseline", published: true).call
+    before_count = diagram.snapshots.count
 
     put "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram", params: {
       organization_id: @organization.id,
@@ -142,6 +192,7 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
     assert_equal 1, data["nodes"].size
     assert_equal 2, data["ports"].size
     assert_equal 1, data["links"].size
+    assert_equal before_count + 1, diagram.reload.snapshots.count
   end
 
   private

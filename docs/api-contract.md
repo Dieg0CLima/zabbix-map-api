@@ -195,8 +195,10 @@ O subdomínio de fusão foi introduzido sob namespace `CableFusion` com `Diagram
 - `PUT .../fusion_diagram`: persiste estrutura do draft (nodes/ports/links), recalcula validação e retorna diagnóstico.
 - `POST .../fusion_diagram/validate`: valida o draft atual sem publicar versão.
 - `POST .../fusion_diagram/publish`: valida e publica, incrementando versão e criando snapshot imutável.
+  - idempotente: se o draft atual já foi publicado sem alterações (checksum igual ao último publicado), não incrementa versão nem cria novo snapshot.
 - `GET .../fusion_diagram/snapshots`: lista snapshots (versionamento).
 - `POST .../fusion_diagram/snapshots/:snapshot_id/restore`: restaura snapshot para novo draft atual.
+  - a restauração também gera snapshot de auditoria com `published=false` e `reason=restore_from_snapshot:<id>`.
 
 Campos principais no payload de retorno:
 
@@ -226,6 +228,21 @@ Regras de validação implementadas na fase 1:
 - conexão entre portas com mesma direção (`*_in` com `*_in`, `*_out` com `*_out`) é inválida;
 - `occupancy_limit` de porta não pode ser excedido;
 - referência de fibra (`fiber_side`, `fiber_number`) duplicada em links do mesmo diagrama é inválida.
+
+Formato de erro de validação (frontend-oriented):
+
+```json
+{
+  "code": "fiber_ref_conflict",
+  "detail": "Fiber a-12 is used multiple times",
+  "path": "links",
+  "meta": {
+    "fiber_side": "a",
+    "fiber_number": 12,
+    "usage": 2
+  }
+}
+```
 
 O payload de cabo (`NetworkCables::PayloadBuilder`) agora inclui `fusion_state` como dimensão separada do monitoramento operacional.
 
