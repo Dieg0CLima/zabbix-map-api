@@ -143,6 +143,10 @@ Rails.application.routes.draw do
           get "items/dropdown", to: "zabbix_connection_dropdowns#items"
         end
       end
+
+      resource :ldap_settings, controller: "ldap_settings", only: %i[show update] do
+        post :test_connection
+      end
     end
   end
 end

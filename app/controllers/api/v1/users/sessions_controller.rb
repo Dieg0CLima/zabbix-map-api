@@ -2,6 +2,33 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
   include RackSessionsFix
   include OrganizationSerializable
   respond_to :json
+  before_action :configure_sign_in_params, only: :create
+
+  def create
+    ldap_config = Auth::Ldap::Config.current
+    return super unless ldap_config.enabled?
+
+    login = params.dig(:user, :email).presence || params.dig(:user, :login).to_s
+    password = params.dig(:user, :password).to_s
+
+    auth_result = Auth::Ldap::Authenticator.new(config: ldap_config).call(login:, password:)
+
+    if auth_result.success?
+      user = Auth::Ldap::UserResolver.new(config: ldap_config).call(
+        email: auth_result.email,
+        login: auth_result.login.presence || login,
+        name: auth_result.name
+      )
+      return render_invalid_login unless user
+
+      sign_in(resource_name, user)
+      return respond_with(user)
+    end
+
+    return super if ldap_config.fallback_to_database_auth?
+
+    render_invalid_login
+  end
 
   private
 
@@ -58,5 +85,13 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
   rescue StandardError => e
     Rails.logger.warn("JWT issue fallback failed: #{e.class}: #{e.message}")
     nil
+  end
+
+  def render_invalid_login
+    render json: { error: "Invalid email or password" }, status: :unauthorized
+  end
+
+  def configure_sign_in_params
+    devise_parameter_sanitizer.permit(:sign_in, keys: [ :organization_id, :org_id, :login ])
   end
 end

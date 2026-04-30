@@ -1,0 +1,28 @@
+default: &default
+  enabled: false
+  allow_sign_up: false
+  fallback_to_database_auth: true
+  servers:
+    - host: <%= ENV.fetch("LDAP_HOST", "") %>
+      port: <%= ENV.fetch("LDAP_PORT", "389").to_i %>
+      encryption: <%= ENV.fetch("LDAP_ENCRYPTION", "start_tls") %>
+      bind_dn: <%= ENV.fetch("LDAP_BIND_DN", "") %>
+      bind_password: <%= ENV.fetch("LDAP_BIND_PASSWORD", "") %>
+      search_base_dns:
+        - <%= ENV.fetch("LDAP_SEARCH_BASE_DN", "") %>
+      search_filter: <%= ENV.fetch("LDAP_SEARCH_FILTER", "(sAMAccountName=%{login})") %>
+      attributes:
+        username: <%= ENV.fetch("LDAP_ATTR_USERNAME", "sAMAccountName") %>
+        email: <%= ENV.fetch("LDAP_ATTR_EMAIL", "mail") %>
+        name: <%= ENV.fetch("LDAP_ATTR_NAME", "displayName") %>
+
+development:
+  <<: *default
+  enabled: <%= ActiveModel::Type::Boolean.new.cast(ENV.fetch("LDAP_ENABLED", "false")) %>
+
+test:
+  <<: *default
+
+production:
+  <<: *default
+  enabled: <%= ActiveModel::Type::Boolean.new.cast(ENV.fetch("LDAP_ENABLED", "false")) %>
