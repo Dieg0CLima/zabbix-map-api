@@ -13,6 +13,7 @@ class NetworkCables::Create
 
     ActiveRecord::Base.transaction do
       cable.save!
+      CableFusion::LoadDiagram.new(cable:).call
       create_points!(cable, points)
       @event_recorder.record!(
         cable:,

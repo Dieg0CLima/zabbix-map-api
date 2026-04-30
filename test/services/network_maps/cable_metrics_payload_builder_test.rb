@@ -1,6 +1,34 @@
 require "test_helper"
 
 class NetworkMaps::CableMetricsPayloadBuilderTest < ActiveSupport::TestCase
+  test "includes fusion metrics dimension separated from zabbix_status" do
+    organization = Organization.create!(name: "Org Fusion Metrics")
+    network_map = organization.network_maps.create!(name: "Mapa Fusion Metrics", source_type: "manual")
+    source_pop = network_map.map_pops.create!(name: "POP Fusion", external_id: "pop-fusion", lat: -23.10, lng: -46.10, color: "#7c3aed")
+    cable = network_map.network_cables.create!(
+      source_pop: source_pop,
+      label: "Cabo Fusion",
+      status: "active",
+      metadata: { "fiber_count" => 4 }
+    )
+
+    diagram = CableFusion::LoadDiagram.new(cable: cable).call
+    diagram.update!(status: "invalid", version: 2, validation_errors_count: 3)
+    node = diagram.nodes.create!(node_type: "dio", label: "DIO", x: 0, y: 0, rotation: 0)
+    p1 = node.ports.create!(name: "P1", port_type: "fiber_in", capacity: 1, occupancy_limit: 2)
+    p2 = node.ports.create!(name: "P2", port_type: "fiber_out", capacity: 1, occupancy_limit: 2)
+    diagram.links.create!(source_port: p1, target_port: p2, link_kind: "splice", fiber_side: "a", fiber_number: 1, status: "draft")
+
+    payload = NetworkMaps::CableMetricsPayloadBuilder.new(network_map: network_map).call
+    cable_payload = payload[:cables].find { |entry| entry[:id] == cable.id }
+
+    assert_equal "unknown", cable_payload[:zabbix_status]
+    assert_equal "invalid", cable_payload[:fusion_state]
+    assert_equal 25.0, cable_payload[:fusion_occupancy_percent]
+    assert_equal 3, cable_payload[:fusion_alerts_count]
+    assert_equal 2, cable_payload[:fusion_published_version]
+  end
+
   test "adds operational_state and operational_details to cable metrics payload" do
     organization = Organization.create!(name: "Org Cable Metrics")
     connection = organization.zabbix_connections.create!(

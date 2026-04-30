@@ -26,6 +26,7 @@ class NetworkCables::PayloadBuilder
       length_meters: @cable.length_meters,
       geometry_version: @cable.metadata&.[]("geometry_version").to_i,
       metadata: @cable.metadata,
+      fusion_state: @cable.cable_fusion_diagram&.status || "draft",
       points: ordered_points
     }
   end

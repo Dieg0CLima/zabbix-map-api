@@ -1,7 +1,7 @@
 # Epic: Módulo de Diagrama de Fusão Integrado ao Fluxo de Cabos
 
 ## Status
-- Estado: `planned`
+- Estado: `in_progress`
 - Dono técnico: backend + frontend maps/inventory
 - Data: `2026-04-30`
 
@@ -93,10 +93,16 @@
 - Aumentar complexidade cedo demais (mitigar por fases).
 
 ## Checklist de execução inicial
-- [ ] Criar migrations `cable_fusion_*`.
-- [ ] Criar models e associações com `NetworkCable`.
-- [ ] Implementar services `CableFusion::LoadDiagram`, `PersistDraft`, `ValidateDraft`.
-- [ ] Expor endpoints v1 iniciais.
-- [ ] Atualizar `docs/api-contract.md`.
+- [x] Criar migrations `cable_fusion_*`.
+- [x] Criar models e associações com `NetworkCable`.
+- [x] Implementar services `CableFusion::LoadDiagram`, `PersistDraft`, `ValidateDraft`.
+- [x] Expor endpoints v1 iniciais.
+- [x] Atualizar `docs/api-contract.md`.
 - [ ] Adicionar testes request + service.
 
+## Progresso recente
+- Fase 2 (parcial) iniciada:
+  - endpoint `publish` implementado com snapshot imutável por versão;
+  - listagem de snapshots implementada;
+  - restore de snapshot para novo draft implementado;
+  - `cable_metrics` passou a expor dimensões de fusão (`fusion_state`, ocupação, alertas, versão publicada).

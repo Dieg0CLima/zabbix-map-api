@@ -10,7 +10,7 @@ class Api::V1::NetworkCablesController < ApplicationController
 
   def index
     cables = NetworkCables::FilterQuery.new(
-      scope: @network_map.network_cables.includes(:network_cable_points),
+      scope: @network_map.network_cables.includes(:network_cable_points, :cable_fusion_diagram),
       params: filter_params,
       network_map: @network_map
     ).call.order(:id)
@@ -90,7 +90,7 @@ class Api::V1::NetworkCablesController < ApplicationController
   end
 
   def set_network_cable
-    @network_cable = @network_map.network_cables.includes(:network_cable_points).find(params[:id])
+    @network_cable = @network_map.network_cables.includes(:network_cable_points, :cable_fusion_diagram).find(params[:id])
   end
 
   def permitted_network_cable_payload

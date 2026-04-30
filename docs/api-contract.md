@@ -158,6 +158,12 @@ Comportamento visual no `editor_state`:
 - `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id`
 - `PATCH /api/v1/network_maps/:network_map_id/network_cables/:id/geometry`
 - `DELETE /api/v1/network_maps/:network_map_id/network_cables/:id`
+- `GET /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram`
+- `PUT /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram`
+- `POST /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram/validate`
+- `POST /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram/publish`
+- `GET /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram/snapshots`
+- `POST /api/v1/network_maps/:network_map_id/network_cables/:network_cable_id/fusion_diagram/snapshots/:snapshot_id/restore`
 
 Criação/edição de endpoints do cabo aceita múltiplas formas de origem/destino:
 
@@ -180,6 +186,48 @@ Quando `source_site_id` ou `target_site_id` for informado e o Site não estiver 
   - limpa o vínculo de `source_node_id`/`target_node_id` do lado editado para evitar conflito com `source_pop_id`/`target_pop_id` em cabos importados.
 
 Opcionalmente, envie `geometry_version` para controle de concorrência otimista. Em caso de conflito, a API retorna `409` com código `geometry_conflict` e os campos `expected_version` e `current_version`.
+
+#### Diagrama de fusão (fase 1)
+
+O subdomínio de fusão foi introduzido sob namespace `CableFusion` com `Diagram` 1:1 por `NetworkCable`.
+
+- `GET .../fusion_diagram`: lazy-create do diagrama em `draft` quando não existir.
+- `PUT .../fusion_diagram`: persiste estrutura do draft (nodes/ports/links), recalcula validação e retorna diagnóstico.
+- `POST .../fusion_diagram/validate`: valida o draft atual sem publicar versão.
+- `POST .../fusion_diagram/publish`: valida e publica, incrementando versão e criando snapshot imutável.
+- `GET .../fusion_diagram/snapshots`: lista snapshots (versionamento).
+- `POST .../fusion_diagram/snapshots/:snapshot_id/restore`: restaura snapshot para novo draft atual.
+
+Campos principais no payload de retorno:
+
+```json
+{
+  "data": {
+    "id": 42,
+    "network_cable_id": 123,
+    "status": "draft",
+    "version": 0,
+    "validation_errors_count": 0,
+    "nodes": [],
+    "ports": [],
+    "links": [],
+    "validation": {
+      "is_valid": true,
+      "errors": []
+    }
+  }
+}
+```
+
+Regras de validação implementadas na fase 1:
+
+- link com portas inexistentes é inválido;
+- `source_port_id == target_port_id` é inválido;
+- conexão entre portas com mesma direção (`*_in` com `*_in`, `*_out` com `*_out`) é inválida;
+- `occupancy_limit` de porta não pode ser excedido;
+- referência de fibra (`fiber_side`, `fiber_number`) duplicada em links do mesmo diagrama é inválida.
+
+O payload de cabo (`NetworkCables::PayloadBuilder`) agora inclui `fusion_state` como dimensão separada do monitoramento operacional.
 
 #### Monitoramento operacional de cabos (realtime + inspeção)
 
@@ -204,6 +252,10 @@ No payload de `cable_metrics` (via `MapChannel` em `initial` e `refresh`), cada 
   "label": "Backbone",
   "status": "active",
   "zabbix_status": "up",
+  "fusion_state": "ready",
+  "fusion_occupancy_percent": 37.5,
+  "fusion_alerts_count": 0,
+  "fusion_published_version": 2,
   "operational_state": "traffic_high",
   "traffic_level": "high",
   "alert_level": "warning",
