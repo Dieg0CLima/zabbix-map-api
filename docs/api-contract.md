@@ -22,6 +22,7 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 - o token JWT expira em `4 horas` a partir do login.
 - a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
 - no modo `single`, o login pode ser feito sem `organization_id`; a organização local é resolvida pelo backend.
+- com LDAP habilitado (`config/ldap.yml`), o login aceita `user.login` (ex.: `sAMAccountName`) além de `user.email`; fallback para autenticação local depende de `fallback_to_database_auth`.
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
@@ -59,6 +60,18 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/network_maps/:id/metrics`
 - `GET /api/v1/network_maps/:id/events`
 - `GET /api/v1/network_maps/:id/cable_metrics`
+
+### Configuração LDAP / Active Directory
+
+- `GET /api/v1/ldap_settings`
+- `PUT /api/v1/ldap_settings`
+- `POST /api/v1/ldap_settings/test_connection`
+
+Regras:
+- endpoints exigem autenticação;
+- apenas `admin` global ou `membership.role=admin` pode alterar/testar;
+- `bind_password` não é retornado em texto puro no `GET` (apenas `bind_password_present`);
+- o login `POST /api/v1/users/sign_in` passa a usar essa configuração persistida quando existir.
 
 Os endpoints de importação aceitam `provider` (padrão `kmz`) e input via `file` (upload) ou `input` (texto KML), com `organization_id` no escopo da organização ativa.
 

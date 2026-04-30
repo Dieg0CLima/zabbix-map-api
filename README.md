@@ -51,6 +51,28 @@ bin/rails server
 bin/rails test
 ```
 
+## LDAP / Active Directory (inicial)
+
+O login em `POST /api/v1/users/sign_in` pode autenticar via LDAP (incluindo AD) quando habilitado.
+
+- configuração: `config/ldap.yml`
+- ativação: `LDAP_ENABLED=true`
+- fallback para senha local Devise: `fallback_to_database_auth`
+- auto-provisionamento de usuário local: `allow_sign_up`
+
+Variáveis comuns para AD:
+
+- `LDAP_HOST`
+- `LDAP_PORT`
+- `LDAP_ENCRYPTION` (`plain`, `start_tls`, `tls`)
+- `LDAP_BIND_DN`
+- `LDAP_BIND_PASSWORD`
+- `LDAP_SEARCH_BASE_DN`
+- `LDAP_SEARCH_FILTER` (padrão `(sAMAccountName=%{login})`)
+- `LDAP_ATTR_USERNAME` (padrão `sAMAccountName`)
+- `LDAP_ATTR_EMAIL` (padrão `mail`)
+- `LDAP_ATTR_NAME` (padrão `displayName`)
+
 ## Consulta de hosts e itens do Zabbix
 
 Os endpoints `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts` e `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items` suportam leitura direta no banco do Zabbix quando a conexão estiver em modo `database` ou `hybrid`:
