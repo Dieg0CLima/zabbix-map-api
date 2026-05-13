@@ -39,7 +39,7 @@ jobs:
           bundler-cache: true
 
       - name: Security scan (brakeman)
-        run: bin/brakeman --no-pager
+        run: bin/brakeman --no-pager --no-ensure-latest
 
       - name: Lint (rubocop)
         run: bin/rubocop -f github
@@ -48,6 +48,14 @@ jobs:
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: zabbix_map_api_test
+          DB_CACHE_NAME: zabbix_map_api_test_cache
+          DB_QUEUE_NAME: zabbix_map_api_test_queue
+          DB_CABLE_NAME: zabbix_map_api_test_cable
         run: bin/rails db:test:prepare test
 
   build-and-push:

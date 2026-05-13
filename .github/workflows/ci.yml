@@ -20,7 +20,7 @@ jobs:
           bundler-cache: true
 
       - name: Scan for common Rails security vulnerabilities using static analysis
-        run: bin/brakeman --no-pager
+        run: bin/brakeman --no-pager --no-ensure-latest
 
   lint:
     runs-on: ubuntu-latest
@@ -73,5 +73,13 @@ jobs:
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: zabbix_map_api_test
+          DB_CACHE_NAME: zabbix_map_api_test_cache
+          DB_QUEUE_NAME: zabbix_map_api_test_queue
+          DB_CABLE_NAME: zabbix_map_api_test_cable
           # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test

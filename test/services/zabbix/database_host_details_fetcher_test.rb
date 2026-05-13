@@ -46,7 +46,6 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
       assert_equal "10.0.0.1", payload[:interfaces].first[:ip]
       assert_equal "Core", payload.dig(:metadata, :groups, 0, :name)
     end
-
   end
 
   test "raises not found when host is absent in zabbix database" do
@@ -64,7 +63,6 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
     fetcher.stub(:database_connection, fake_database_connection) do
       assert_raises(Zabbix::DatabaseHostDetailsFetcher::NotFoundError) { fetcher.call }
     end
-
   end
 
   private

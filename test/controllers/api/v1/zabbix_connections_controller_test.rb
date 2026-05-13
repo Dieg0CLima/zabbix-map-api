@@ -42,5 +42,4 @@ class Api::V1::ZabbixConnectionsControllerTest < ActiveSupport::TestCase
       assert_equal "new-secret", permitted[:db_password]
     end
   end
-
 end
