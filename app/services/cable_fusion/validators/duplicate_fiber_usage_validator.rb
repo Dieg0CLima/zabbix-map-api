@@ -10,7 +10,7 @@ module CableFusion
         @diagram.links.each do |link|
           next if link.fiber_side.blank? || link.fiber_number.blank?
 
-          refs[[link.fiber_side, link.fiber_number]] += 1
+          refs[[ link.fiber_side, link.fiber_number ]] += 1
         end
 
         refs.each_with_object([]) do |((side, number), count), errors|

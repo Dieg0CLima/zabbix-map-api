@@ -48,7 +48,7 @@ module Sites
           items = site_map_node&.map_node_items&.to_a || []
           items
             .select { |item| PingItemMatcher.icmp_metric_item?(item.zabbix_item) }
-            .sort_by { |item| [PingItemMatcher::METRIC_KIND_PRIORITY.fetch(PingItemMatcher.icmp_metric_kind(item.zabbix_item), 99), item.display_order.to_i, item.id.to_i] }
+            .sort_by { |item| [ PingItemMatcher::METRIC_KIND_PRIORITY.fetch(PingItemMatcher.icmp_metric_kind(item.zabbix_item), 99), item.display_order.to_i, item.id.to_i ] }
         end
       end
 

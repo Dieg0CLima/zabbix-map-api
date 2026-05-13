@@ -13,6 +13,6 @@ class NetworkCables::EventStateBuilderTest < ActiveSupport::TestCase
     state = NetworkCables::EventStateBuilder.call(cable:)
 
     assert_equal "active", state[:status]
-    assert_equal [[1, 10.0, 10.0], [2, 20.0, 20.0]], state[:points]
+    assert_equal [ [ 1, 10.0, 10.0 ], [ 2, 20.0, 20.0 ] ], state[:points]
   end
 end

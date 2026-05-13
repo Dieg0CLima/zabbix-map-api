@@ -221,6 +221,11 @@ Campos principais no payload de retorno:
 }
 ```
 
+Enums aceitos (compatíveis com o frontend atual):
+
+- `nodes[].type`: `splice_box`, `dio`, `splitter`, `tray`, `cto`, `termination_box`, `reserve`, `closure`, `patch_panel`, `odf`, `olt`, `ceo`, `drop`, `client`
+- `ports[].port_type`: `fiber_in`, `fiber_out`, `splitter_in`, `splitter_out`, `patch`, `uplink`, `splice_port`
+
 Regras de validação implementadas na fase 1:
 
 - link com portas inexistentes é inválido;

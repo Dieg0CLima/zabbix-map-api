@@ -8,7 +8,7 @@ class ZabbixHosts::ItemsFetcher
   def initialize(connection:, hostid:, limit: nil, force_refresh: false)
     @connection    = connection
     @hostid        = hostid.to_s.strip
-    @limit         = [limit.to_i.positive? ? limit.to_i : DEFAULT_LIMIT, 2_000].min
+    @limit         = [ limit.to_i.positive? ? limit.to_i : DEFAULT_LIMIT, 2_000 ].min
     @force_refresh = force_refresh
   end
 

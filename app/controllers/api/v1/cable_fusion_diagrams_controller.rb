@@ -68,7 +68,7 @@ class Api::V1::CableFusionDiagramsController < ApplicationController
 
     render json: { data: CableFusion::PayloadBuilder.new(diagram:, validation:).call }, status: :ok
   rescue ActiveRecord::RecordNotFound
-    render json: { error: "Snapshot not found" }, status: :not_found
+    render json: { errors: [ { detail: "Snapshot not found" } ] }, status: :not_found
   end
 
   private

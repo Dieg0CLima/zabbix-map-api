@@ -19,7 +19,7 @@ class Api::V1::DevicesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "catalogs returns device dropdown options from API" do
-    get "/api/v1/devices/catalogs", params: { organization_id: @organization.id }, headers: auth_headers, as: :json
+    get "/api/v1/devices/catalogs", params: { organization_id: @organization.id }, headers: auth_headers.merge("Accept" => "application/json")
 
     assert_response :ok
 
@@ -38,7 +38,7 @@ class Api::V1::DevicesControllerTest < ActionDispatch::IntegrationTest
       name: "HOST-CORE-BRASILIA",
       status: "enabled",
       available: true,
-      interfaces: [{ ip: "10.0.0.1", dns: "", type: "snmp", main: true }],
+      interfaces: [ { ip: "10.0.0.1", dns: "", type: "snmp", main: true } ],
       metadata: { host: "core-bsb-01", inventory: { vendor: "Huawei", model: "S5720" } }
     }
 

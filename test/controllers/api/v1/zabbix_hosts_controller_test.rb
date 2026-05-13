@@ -39,23 +39,25 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
         status: "enabled",
         available: true,
         metadata: {
-          interfaces: [{ ip: "10.10.10.1", dns: "", type: "snmp", main: true }],
-          groups: [{ groupid: "8", name: "OLT" }],
-          templates: [{ templateid: "19", name: "Template SNMP" }]
+          interfaces: [ { ip: "10.10.10.1", dns: "", type: "snmp", main: true } ],
+          groups: [ { groupid: "8", name: "OLT" } ],
+          templates: [ { templateid: "19", name: "Template SNMP" } ]
         }
       }
     ]
 
-    fetcher = Minitest::Mock.new
-    fetcher.expect(:call, fake_result)
+    fetcher = Struct.new(:result) do
+      def call
+        result
+      end
+    end.new(fake_result)
 
-    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher) do
+    fetcher_factory = ->(**_kwargs) { fetcher }
+    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher_factory) do
       get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
         organization_id: @organization.id
-      }, headers: auth_headers, as: :json
+      }, headers: auth_headers.merge("Accept" => "application/json")
     end
-
-    fetcher.verify
 
     assert_response :ok
 
@@ -82,17 +84,19 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
       }
     ]
 
-    fetcher = Minitest::Mock.new
-    fetcher.expect(:call, fake_result)
+    fetcher = Struct.new(:result) do
+      def call
+        result
+      end
+    end.new(fake_result)
 
-    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher) do
+    fetcher_factory = ->(**_kwargs) { fetcher }
+    ZabbixConnections::HostDropdownFetcher.stub(:new, fetcher_factory) do
       get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/dropdown", params: {
         organization_id: @organization.id,
         q: "SWCX"
-      }, headers: auth_headers, as: :json
+      }, headers: auth_headers.merge("Accept" => "application/json")
     end
-
-    fetcher.verify
 
     assert_response :ok
 
@@ -108,12 +112,12 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
       host: "core-bsb-01",
       status: "enabled",
       available: true,
-      interfaces: [{ ip: "10.0.0.1", dns: "", type: "snmp", main: true }],
+      interfaces: [ { ip: "10.0.0.1", dns: "", type: "snmp", main: true } ],
       inventory: { vendor: "Huawei", model: "S5720" },
       metadata: {
         host: "core-bsb-01",
-        groups: [{ groupid: "4", name: "Core" }],
-        templates: [{ templateid: "22", name: "Base Template" }]
+        groups: [ { groupid: "4", name: "Core" } ],
+        templates: [ { templateid: "22", name: "Base Template" } ]
       },
       suggested_device_attributes: {
         name: "HOST-CORE-BRASILIA",
@@ -124,16 +128,18 @@ class Api::V1::ZabbixHostsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    fetcher = Minitest::Mock.new
-    fetcher.expect(:call, payload)
+    fetcher = Struct.new(:result) do
+      def call
+        result
+      end
+    end.new(payload)
 
-    Zabbix::HostDetailsFetcher.stub(:new, fetcher) do
+    fetcher_factory = ->(**_kwargs) { fetcher }
+    Zabbix::HostDetailsFetcher.stub(:new, fetcher_factory) do
       get "/api/v1/zabbix_connections/#{@connection.id}/zabbix_hosts/10572", params: {
         organization_id: @organization.id
-      }, headers: auth_headers, as: :json
+      }, headers: auth_headers.merge("Accept" => "application/json")
     end
-
-    fetcher.verify
 
     assert_response :ok
 

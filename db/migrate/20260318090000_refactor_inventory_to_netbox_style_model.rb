@@ -85,8 +85,8 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       add_timestamps :sites, null: true unless column_exists?(:sites, :created_at) || column_exists?(:sites, :updated_at)
     end
 
-    add_index :sites, [:organization_id, :slug], unique: true unless index_exists?(:sites, [:organization_id, :slug], unique: true)
-    add_index :sites, [:organization_id, :name] unless index_exists?(:sites, [:organization_id, :name])
+    add_index :sites, [ :organization_id, :slug ], unique: true unless index_exists?(:sites, [ :organization_id, :slug ], unique: true)
+    add_index :sites, [ :organization_id, :name ] unless index_exists?(:sites, [ :organization_id, :name ])
   end
 
   def ensure_devices_table!
@@ -120,9 +120,9 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       add_timestamps :devices, null: true unless column_exists?(:devices, :created_at) || column_exists?(:devices, :updated_at)
     end
 
-    add_index :devices, [:organization_id, :name] unless index_exists?(:devices, [:organization_id, :name])
-    add_index :devices, [:organization_id, :hostname] unless index_exists?(:devices, [:organization_id, :hostname])
-    add_index :devices, [:organization_id, :serial_number] unless index_exists?(:devices, [:organization_id, :serial_number])
+    add_index :devices, [ :organization_id, :name ] unless index_exists?(:devices, [ :organization_id, :name ])
+    add_index :devices, [ :organization_id, :hostname ] unless index_exists?(:devices, [ :organization_id, :hostname ])
+    add_index :devices, [ :organization_id, :serial_number ] unless index_exists?(:devices, [ :organization_id, :serial_number ])
   end
 
   def ensure_device_interfaces_table!
@@ -148,7 +148,7 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       add_timestamps :device_interfaces, null: true unless column_exists?(:device_interfaces, :created_at) || column_exists?(:device_interfaces, :updated_at)
     end
 
-    add_index :device_interfaces, [:device_id, :name], unique: true unless index_exists?(:device_interfaces, [:device_id, :name], unique: true)
+    add_index :device_interfaces, [ :device_id, :name ], unique: true unless index_exists?(:device_interfaces, [ :device_id, :name ], unique: true)
   end
 
   def ensure_network_maps_metadata!
@@ -158,7 +158,7 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
   def ensure_map_nodes_projection_columns!
     add_column :map_nodes, :mappable_type, :string unless column_exists?(:map_nodes, :mappable_type)
     add_column :map_nodes, :mappable_id, :bigint unless column_exists?(:map_nodes, :mappable_id)
-    add_index :map_nodes, [:mappable_type, :mappable_id] unless index_exists?(:map_nodes, [:mappable_type, :mappable_id])
+    add_index :map_nodes, [ :mappable_type, :mappable_id ] unless index_exists?(:map_nodes, [ :mappable_type, :mappable_id ])
     add_column :map_nodes, :width, :integer unless column_exists?(:map_nodes, :width)
     add_column :map_nodes, :height, :integer unless column_exists?(:map_nodes, :height)
     add_column :map_nodes, :label_override, :string unless column_exists?(:map_nodes, :label_override)
@@ -180,8 +180,8 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       end
     end
 
-    unless index_exists?(:map_edges, [:network_map_id, :source_node_id, :target_node_id, :edge_type], unique: true, name: "idx_map_edges_uniqueness")
-      add_index :map_edges, [:network_map_id, :source_node_id, :target_node_id, :edge_type], unique: true, name: "idx_map_edges_uniqueness"
+    unless index_exists?(:map_edges, [ :network_map_id, :source_node_id, :target_node_id, :edge_type ], unique: true, name: "idx_map_edges_uniqueness")
+      add_index :map_edges, [ :network_map_id, :source_node_id, :target_node_id, :edge_type ], unique: true, name: "idx_map_edges_uniqueness"
     end
   end
 
@@ -201,9 +201,9 @@ class RefactorInventoryToNetboxStyleModel < ActiveRecord::Migration[8.0]
       end
     end
 
-    add_index :zabbix_links, [:linkable_type, :linkable_id] unless index_exists?(:zabbix_links, [:linkable_type, :linkable_id])
-    unless index_exists?(:zabbix_links, [:organization_id, :zabbix_connection_id, :resource_type, :external_id], unique: true, name: "idx_zabbix_links_external_uniqueness")
-      add_index :zabbix_links, [:organization_id, :zabbix_connection_id, :resource_type, :external_id], unique: true, name: "idx_zabbix_links_external_uniqueness"
+    add_index :zabbix_links, [ :linkable_type, :linkable_id ] unless index_exists?(:zabbix_links, [ :linkable_type, :linkable_id ])
+    unless index_exists?(:zabbix_links, [ :organization_id, :zabbix_connection_id, :resource_type, :external_id ], unique: true, name: "idx_zabbix_links_external_uniqueness")
+      add_index :zabbix_links, [ :organization_id, :zabbix_connection_id, :resource_type, :external_id ], unique: true, name: "idx_zabbix_links_external_uniqueness"
     end
   end
 

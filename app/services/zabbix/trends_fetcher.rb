@@ -17,7 +17,7 @@ module Zabbix
 
     def fetch_trends(client, adapter, table)
       rows = if adapter == :postgresql
-        client.exec_params(postgresql_sql(table), [@itemids])
+        client.exec_params(postgresql_sql(table), [ @itemids ])
       else
         statement = client.prepare(mysql_sql(table))
         begin

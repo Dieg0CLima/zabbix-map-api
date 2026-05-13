@@ -26,7 +26,7 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
   test "show lazily creates fusion diagram" do
     get "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram", params: {
       organization_id: @organization.id
-    }, headers: auth_headers, as: :json
+    }, headers: auth_headers.merge("Accept" => "application/json")
 
     assert_response :ok
     data = response.parsed_body.fetch("data")
@@ -59,6 +59,30 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
     assert_equal 1, data["nodes"].size
     assert_equal 2, data["ports"].size
     assert_equal 1, data["links"].size
+  end
+
+  test "update accepts frontend node and port enums" do
+    put "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram", params: {
+      organization_id: @organization.id,
+      fusion_diagram: {
+        nodes: [
+          { client_id: "node-closure", type: "closure", label: "Closure A", x: 10, y: 20, rotation: 0 }
+        ],
+        ports: [
+          { client_id: "port-left", node_client_id: "node-closure", name: "P1", port_type: "splice_port", capacity: 1, occupancy_limit: 1 },
+          { client_id: "port-right", node_client_id: "node-closure", name: "P2", port_type: "splice_port", capacity: 1, occupancy_limit: 1 }
+        ],
+        links: [
+          { client_id: "link-1", source_port_client_id: "port-left", target_port_client_id: "port-right", link_kind: "splice", fiber_side: "a", fiber_number: 1 }
+        ]
+      }
+    }, headers: auth_headers, as: :json
+
+    assert_response :ok
+    data = response.parsed_body.fetch("data")
+    assert_equal "closure", data.dig("nodes", 0, "type")
+    assert_equal "splice_port", data.dig("ports", 0, "port_type")
+    assert_equal true, data.dig("validation", "is_valid")
   end
 
   test "validate reports conflicts for duplicated fiber reference" do
@@ -110,7 +134,7 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
 
     get "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/snapshots", params: {
       organization_id: @organization.id
-    }, headers: auth_headers, as: :json
+    }, headers: auth_headers.merge("Accept" => "application/json")
 
     assert_response :ok
     snapshots = response.parsed_body.fetch("data")
@@ -148,7 +172,7 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
 
     get "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram/snapshots", params: {
       organization_id: @organization.id
-    }, headers: auth_headers, as: :json
+    }, headers: auth_headers.merge("Accept" => "application/json")
     assert_response :ok
     assert_equal 1, response.parsed_body.fetch("data").size
   end

@@ -1,13 +1,13 @@
 require "test_helper"
 
 class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
-  test "create accepts map_pop_id as pop external_id" do
+  test "create attaches a site as mappable" do
     organization = Organization.create!(name: "Org Node API")
     user = User.create!(email: "node.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
     Membership.create!(user:, organization:, role: "editor")
 
     network_map = organization.network_maps.create!(name: "Mapa API", source_type: "manual")
-    pop = network_map.map_pops.create!(name: "POP API", external_id: "pop-api", lat: -23.0, lng: -46.0, color: "#7c3aed")
+    site = organization.sites.create!(name: "POP API")
 
     post "/api/v1/users/sign_in", params: {
       user: {
@@ -17,18 +17,14 @@ class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
       }
     }, as: :json
 
-    assert_response :ok
-
     auth_header = response.headers["Authorization"]
-    assert auth_header.present?
 
-    post "/api/v1/network_maps/#{network_map.id}/map_nodes", params: {
+    post "/api/v1/network_maps/#{network_map.id}/nodes", params: {
       map_node: {
-        label: "Router API",
-        node_kind: "router",
+        mappable_type: "Site",
+        mappable_id: site.id,
         x: 100,
-        y: 120,
-        map_pop_id: pop.external_id
+        y: 120
       },
       organization_id: organization.id
     }, headers: {
@@ -38,23 +34,17 @@ class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
 
     created_node = network_map.map_nodes.order(:id).last
-    assert_equal pop.id, created_node.map_pop_id
+    assert_equal "Site", created_node.mappable_type
+    assert_equal site.id, created_node.mappable_id
   end
 
-
-  test "create persists zabbix_host_id when host belongs to map connection" do
-    organization = Organization.create!(name: "Org Node Host API")
-    user = User.create!(email: "node.host.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
+  test "create attaches a device as mappable" do
+    organization = Organization.create!(name: "Org Node Device API")
+    user = User.create!(email: "node.device.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
     Membership.create!(user:, organization:, role: "editor")
 
-    connection = organization.zabbix_connections.create!(
-      name: "Conn Node",
-      status: "active",
-      connection_mode: "api",
-      base_url: "https://zabbix.local"
-    )
-    host = connection.zabbix_hosts.create!(hostid: "10105", name: "OLT-1")
-    network_map = organization.network_maps.create!(name: "Mapa API Host", source_type: "manual", zabbix_connection: connection)
+    network_map = organization.network_maps.create!(name: "Mapa API Device", source_type: "manual")
+    device = organization.devices.create!(name: "Router API", role: "router", status: "active")
 
     post "/api/v1/users/sign_in", params: {
       user: {
@@ -64,63 +54,14 @@ class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
       }
     }, as: :json
 
-    assert_response :ok
-
     auth_header = response.headers["Authorization"]
 
-    post "/api/v1/network_maps/#{network_map.id}/map_nodes", params: {
+    post "/api/v1/network_maps/#{network_map.id}/nodes", params: {
       map_node: {
-        label: "Router API",
-        node_kind: "router",
-        x: 100,
-        y: 120,
-        zabbix_host_id: host.id
-      },
-      organization_id: organization.id
-    }, headers: {
-      "Authorization" => auth_header
-    }, as: :json
-
-    assert_response :created
-
-    created_node = network_map.map_nodes.order(:id).last
-    assert_equal host.id, created_node.zabbix_host_id
-  end
-
-
-  test "create accepts zabbix hostid and resolves to local zabbix_host id" do
-    organization = Organization.create!(name: "Org Node HostId API")
-    user = User.create!(email: "node.hostid.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
-    Membership.create!(user:, organization:, role: "editor")
-
-    connection = organization.zabbix_connections.create!(
-      name: "Conn HostId",
-      status: "active",
-      connection_mode: "api",
-      base_url: "https://zabbix.local"
-    )
-    host = connection.zabbix_hosts.create!(hostid: "10658", name: "SWCX-001-001-005-CENTRAL")
-    network_map = organization.network_maps.create!(name: "Mapa API HostId", source_type: "manual", zabbix_connection: connection)
-
-    post "/api/v1/users/sign_in", params: {
-      user: {
-        email: user.email,
-        password: "Password!123",
-        organization_id: organization.id
-      }
-    }, as: :json
-
-    assert_response :ok
-
-    auth_header = response.headers["Authorization"]
-
-    post "/api/v1/network_maps/#{network_map.id}/map_nodes", params: {
-      map_node: {
-        label: "Switch API",
-        node_kind: "switch",
+        mappable_type: "Device",
+        mappable_id: device.id,
         x: 80,
-        y: 95,
-        zabbix_host_id: "10658"
+        y: 95
       },
       organization_id: organization.id
     }, headers: {
@@ -130,8 +71,40 @@ class Api::V1::MapNodesControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
 
     created_node = network_map.map_nodes.order(:id).last
-    assert_equal host.id, created_node.zabbix_host_id
-    assert_equal "10658", created_node.zabbix_ref
+    assert_equal "Device", created_node.mappable_type
+    assert_equal device.id, created_node.mappable_id
   end
 
+  test "create rejects unsupported mappable type" do
+    organization = Organization.create!(name: "Org Node Unsupported API")
+    user = User.create!(email: "node.unsupported.editor@example.com", password: "Password!123", password_confirmation: "Password!123")
+    Membership.create!(user:, organization:, role: "editor")
+
+    network_map = organization.network_maps.create!(name: "Mapa API Unsupported", source_type: "manual")
+
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: user.email,
+        password: "Password!123",
+        organization_id: organization.id
+      }
+    }, as: :json
+
+    auth_header = response.headers["Authorization"]
+
+    post "/api/v1/network_maps/#{network_map.id}/nodes", params: {
+      map_node: {
+        mappable_type: "MapPop",
+        mappable_id: 123,
+        x: 80,
+        y: 95
+      },
+      organization_id: organization.id
+    }, headers: {
+      "Authorization" => auth_header
+    }, as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "Unsupported mappable type", response.parsed_body.dig("errors", 0, "detail")
+  end
 end

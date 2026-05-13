@@ -2,7 +2,7 @@ module CableFusion
   class Port < ApplicationRecord
     self.table_name = "cable_fusion_ports"
 
-    PORT_TYPES = %w[fiber_in fiber_out splitter_in splitter_out patch uplink].freeze
+    PORT_TYPES = %w[fiber_in fiber_out splitter_in splitter_out patch uplink splice_port].freeze
 
     belongs_to :node, class_name: "CableFusion::Node", inverse_of: :ports
 

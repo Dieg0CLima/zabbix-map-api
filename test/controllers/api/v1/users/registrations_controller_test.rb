@@ -2,7 +2,7 @@ require "test_helper"
 
 class Api::V1::Users::RegistrationsControllerTest < ActionDispatch::IntegrationTest
   test "sign up creates user and organization via service" do
-    assert_difference ["User.count", "Organization.count", "Membership.count"], 1 do
+    assert_difference [ "User.count", "Organization.count", "Membership.count" ], 1 do
       post "/api/v1/users", params: {
         user: {
           email: "service.test@example.com",
@@ -27,7 +27,7 @@ class Api::V1::Users::RegistrationsControllerTest < ActionDispatch::IntegrationT
   test "sign up joins existing organization" do
     existing_org = Organization.create!(name: "Pre-Existing Org")
 
-    assert_difference ["User.count", "Membership.count"], 1 do
+    assert_difference [ "User.count", "Membership.count" ], 1 do
       assert_no_difference "Organization.count" do
         post "/api/v1/users", params: {
           user: {
@@ -51,7 +51,7 @@ class Api::V1::Users::RegistrationsControllerTest < ActionDispatch::IntegrationT
 
   test "sign up without organization" do
     assert_difference "User.count", 1 do
-      assert_no_difference ["Organization.count", "Membership.count"] do
+      assert_no_difference [ "Organization.count", "Membership.count" ] do
         post "/api/v1/users", params: {
           user: {
             email: "solo@example.com",

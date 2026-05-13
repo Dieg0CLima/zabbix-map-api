@@ -54,7 +54,7 @@ module Devices
       def normalize_per_page(per_page, limit)
         candidate = per_page.presence || limit
         normalized = candidate.to_i.positive? ? candidate.to_i : DEFAULT_PER_PAGE
-        [normalized, MAX_PER_PAGE].min
+        [ normalized, MAX_PER_PAGE ].min
       end
 
       def empty_result

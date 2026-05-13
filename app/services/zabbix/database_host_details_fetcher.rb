@@ -43,7 +43,7 @@ module Zabbix
 
     def fetch_host_row(client, adapter)
       if adapter == :postgresql
-        client.exec_params(postgresql_host_sql, [@hostid]).first
+        client.exec_params(postgresql_host_sql, [ @hostid ]).first
       else
         statement = client.prepare(mysql_host_sql)
         begin
@@ -88,7 +88,7 @@ module Zabbix
 
     def query_rows(client, adapter, pg_sql, mysql_sql)
       if adapter == :postgresql
-        client.exec_params(pg_sql, [@hostid]).to_a
+        client.exec_params(pg_sql, [ @hostid ]).to_a
       else
         statement = client.prepare(mysql_sql)
         begin

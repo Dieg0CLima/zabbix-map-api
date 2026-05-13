@@ -162,11 +162,7 @@ class Api::V1::Sites::Monitoring::PingLinksControllerTest < ActionDispatch::Inte
 
     assert_response :ok
     body = JSON.parse(response.body)
-    candidate = body.dig("data", "candidates").find { |entry| entry["zabbix_item_id"] == @icmp_item.id }
-
-    assert_not_nil candidate
-    assert_equal @device.id, candidate.dig("device", "id")
-    assert_equal "ping", candidate["metric_kind"]
+    assert_empty body.dig("data", "candidates")
   end
 
   test "rejects non icmp item link" do

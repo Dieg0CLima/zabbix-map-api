@@ -21,9 +21,9 @@ class NetworkMaps::PersistEditorStateTest < ActiveSupport::TestCase
       network_map:,
       payload: {
         active_base_layer: "terrain",
-        pops: [{ id: "pop-a", name: "POP A Atualizado", lat: -23.11, lng: -46.11, color: "#111111", metadata: { region: "centro" } }],
-        markers: [{ id: "node-a", pop_id: "pop-a", label: "OLT A2", node_kind: "olt", lat: -23.11, lng: -46.11, icon: "pi-server", color: "#222222", size: 32, metadata: {} }],
-        edges: [{ id: "cable-a", source_pop_id: "pop-a", source_node_id: "node-a", cable_type: "feeder", status: "active", color: "#333333", weight: 5, pattern: "dashed", metadata: { fiber_count: 24 }, points: [{ position: 0, lat: -23.110001, lng: -46.110001 }, { position: 1, lat: -23.110002, lng: -46.110002 }] }],
+        pops: [ { id: "pop-a", name: "POP A Atualizado", lat: -23.11, lng: -46.11, color: "#111111", metadata: { region: "centro" } } ],
+        markers: [ { id: "node-a", pop_id: "pop-a", label: "OLT A2", node_kind: "olt", lat: -23.11, lng: -46.11, icon: "pi-server", color: "#222222", size: 32, metadata: {} } ],
+        edges: [ { id: "cable-a", source_pop_id: "pop-a", source_node_id: "node-a", cable_type: "feeder", status: "active", color: "#333333", weight: 5, pattern: "dashed", metadata: { fiber_count: 24 }, points: [ { position: 0, lat: -23.110001, lng: -46.110001 }, { position: 1, lat: -23.110002, lng: -46.110002 } ] } ],
         history_label: "Autosave Test",
         history_index: 3
       }

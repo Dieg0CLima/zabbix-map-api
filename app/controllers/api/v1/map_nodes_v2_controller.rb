@@ -74,7 +74,7 @@ class Api::V1::MapNodesV2Controller < Api::V1::BaseController
     when "Site" then find_record(current_organization.sites, id)
     when "Device" then find_record(current_organization.devices, id)
     else
-      render_errors(status: :unprocessable_entity, errors: [{ source: :mappable_type, detail: "Unsupported mappable type" }])
+      render_errors(status: :unprocessable_entity, errors: [ { source: :mappable_type, detail: "Unsupported mappable type" } ])
       nil
     end
   end

@@ -1,4 +1,6 @@
 class Device < ApplicationRecord
+  require "securerandom"
+
   ROLES = %w[generic router switch firewall gateway server endpoint olt cto splitter].freeze
   STATUSES = %w[planned active maintenance offline decommissioned].freeze
 
@@ -18,8 +20,11 @@ class Device < ApplicationRecord
   has_many :monitoring_items, through: :monitoring_profile, source: :device_monitoring_items
 
   validates :name, presence: true
+  validates :external_id, presence: true, uniqueness: { scope: :organization_id }
   validates :role, presence: true, inclusion: { in: ROLES }
   validates :status, inclusion: { in: STATUSES }
+
+  before_validation :ensure_external_id
 
   validate :site_must_belong_to_same_organization
   validate :zabbix_host_link_consistency
@@ -37,6 +42,13 @@ class Device < ApplicationRecord
   end
 
   private
+
+  def ensure_external_id
+    return if external_id.present?
+
+    base = hostname.presence || name.to_s.parameterize.presence || "device"
+    self.external_id = "#{base}-#{SecureRandom.hex(4)}"
+  end
 
   def site_must_belong_to_same_organization
     return if site.blank? || site.organization_id == organization_id

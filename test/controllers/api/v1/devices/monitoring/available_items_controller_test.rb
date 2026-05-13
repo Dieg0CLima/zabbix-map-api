@@ -60,8 +60,7 @@ class Api::V1::Devices::Monitoring::AvailableItemsControllerTest < ActionDispatc
 
     get "/api/v1/devices/#{device.id}/monitoring/available-items",
         params: { organization_id: organization.id, q: "traffic", page: 2, per_page: 1 },
-        headers: { "Authorization" => auth_header },
-        as: :json
+        headers: { "Authorization" => auth_header, "Accept" => "application/json" }
 
     assert_response :ok
     payload = response.parsed_body

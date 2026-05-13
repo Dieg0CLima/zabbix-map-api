@@ -32,7 +32,7 @@ class NetworkCables::CreateTest < ActiveSupport::TestCase
     error = assert_raises(NetworkCables::Errors::InvalidPoints) do
       NetworkCables::Create.new(
         network_map:,
-        payload: { points: [{ position: 0, lat: -23.11, lng: -46.11 }] },
+        payload: { points: [ { position: 0, lat: -23.11, lng: -46.11 } ] },
         actor_email: "editor@example.com"
       ).call
     end

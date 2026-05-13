@@ -41,8 +41,7 @@ class Api::V1::NetworkMapsV2ControllerTest < ActionDispatch::IntegrationTest
 
     get "/api/v1/network_maps/#{network_map.id}/cable_metrics",
         params: { organization_id: organization.id },
-        headers: { "Authorization" => auth_header },
-        as: :json
+        headers: { "Authorization" => auth_header, "Accept" => "application/json" }
 
     assert_response :ok
 

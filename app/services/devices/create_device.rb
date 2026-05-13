@@ -13,7 +13,7 @@ class Devices::CreateDevice
       Devices::MonitoringProfileSync.new(device: device).call
       device.reload
       marker = attach_to_map(device) if add_to_map?
-      [device, marker]
+      [ device, marker ]
     end
   end
 

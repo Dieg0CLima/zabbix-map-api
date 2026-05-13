@@ -2,6 +2,7 @@ module Maps
   module Import
     class StatusStore
       TTL = 24.hours
+      FALLBACK_CACHE = ActiveSupport::Cache::MemoryStore.new
 
       class << self
         def enqueue!(organization:, import_id:, provider:, mode:, requested_by_user_id:, network_map_id: nil)
@@ -40,7 +41,7 @@ module Maps
               finished_at: Time.current.iso8601,
               summary: result.summary,
               report: result.report,
-              warnings: Array(result.warnings),
+              warnings: Array(result.respond_to?(:warnings) ? result.warnings : nil),
               network_map_id: result.network_map&.id,
               network_map_name: result.network_map&.name
             }
@@ -64,7 +65,7 @@ module Maps
         end
 
         def fetch(organization:, import_id:)
-          Rails.cache.read(cache_key(organization_id: organization.id, import_id: import_id))
+          cache_backend.read(cache_key(organization_id: organization.id, import_id: import_id))
         end
 
         private
@@ -80,12 +81,19 @@ module Maps
 
         def write!(organization:, import_id:, payload:)
           key = cache_key(organization_id: organization.id, import_id: import_id)
-          Rails.cache.write(key, payload, expires_in: TTL)
+          cache_backend.write(key, payload, expires_in: TTL)
           payload
         end
 
         def cache_key(organization_id:, import_id:)
           "maps:import:status:v1:org:#{organization_id}:import:#{import_id}"
+        end
+
+        def cache_backend
+          backend = Rails.cache
+          return FALLBACK_CACHE if backend.is_a?(ActiveSupport::Cache::NullStore)
+
+          backend
         end
       end
     end

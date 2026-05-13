@@ -10,7 +10,7 @@ class CreateNetworkCableItems < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :network_cable_items, [:network_cable_id, :zabbix_item_id],
+    add_index :network_cable_items, [ :network_cable_id, :zabbix_item_id ],
               unique: true,
               name: "index_network_cable_items_on_cable_and_item"
   end

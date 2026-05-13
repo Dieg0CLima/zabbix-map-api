@@ -12,6 +12,6 @@ class ZabbixItems::FetchTest < ActiveSupport::TestCase
     items = ZabbixItems::Fetch.new(connection:, hostid: nil, zabbix_host_id: host_a.id, limit: nil).call
 
     assert_equal 1, items.count
-    assert_equal "CPU", items.first.name
+    assert_equal "CPU", items.first[:name]
   end
 end

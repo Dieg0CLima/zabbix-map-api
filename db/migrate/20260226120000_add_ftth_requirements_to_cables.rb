@@ -16,7 +16,7 @@ class AddFtthRequirementsToCables < ActiveRecord::Migration[8.0]
       t.timestamps
     end
 
-    add_index :network_cable_events, [:network_cable_id, :occurred_at]
-    add_index :network_cable_events, [:network_map_id, :occurred_at]
+    add_index :network_cable_events, [ :network_cable_id, :occurred_at ]
+    add_index :network_cable_events, [ :network_map_id, :occurred_at ]
   end
 end

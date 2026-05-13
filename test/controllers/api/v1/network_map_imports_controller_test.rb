@@ -166,8 +166,9 @@ class Api::V1::NetworkMapImportsControllerTest < ActionDispatch::IntegrationTest
     get "/api/v1/network_maps/imports/#{import_id}/status", params: {
       organization_id: organization.id
     }, headers: {
-      "Authorization" => auth_header
-    }, as: :json
+      "Authorization" => auth_header,
+      "Accept" => "application/json"
+    }
 
     assert_response :ok
     status_payload = response.parsed_body.fetch("data")

@@ -84,7 +84,7 @@ module Zabbix
 
     def fetch_history_from_table(client, adapter, table, ids)
       if adapter == :postgresql
-        client.exec_params(postgresql_sql(table), [ids]).to_a
+        client.exec_params(postgresql_sql(table), [ ids ]).to_a
       else
         client.query(mysql_sql(table, ids)).to_a
       end

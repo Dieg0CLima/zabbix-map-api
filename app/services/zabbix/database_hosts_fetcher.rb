@@ -17,7 +17,7 @@ module Zabbix
 
       database_connection.with_client do |client, adapter|
         rows = if adapter == :postgresql
-          client.exec_params(postgresql_sql, [search_term, @limit]).to_a
+          client.exec_params(postgresql_sql, [ search_term, @limit ]).to_a
         else
           statement = client.prepare(mysql_sql)
           begin
@@ -95,7 +95,7 @@ module Zabbix
     def normalize_limit(limit)
       value = limit.to_i
       value = DEFAULT_LIMIT if value <= 0
-      [value, MAX_LIMIT].min
+      [ value, MAX_LIMIT ].min
     end
   end
 end

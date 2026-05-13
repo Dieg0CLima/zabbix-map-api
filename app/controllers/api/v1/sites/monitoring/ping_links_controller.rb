@@ -31,7 +31,7 @@ class Api::V1::Sites::Monitoring::PingLinksController < Api::V1::BaseController
       }
     )
   rescue Sites::Monitoring::ValidationError => e
-    render_errors(status: e.status, errors: [{ source: e.source, detail: e.message }])
+    render_errors(status: e.status, errors: [ { source: e.source, detail: e.message } ])
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
