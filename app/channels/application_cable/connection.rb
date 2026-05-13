@@ -15,7 +15,7 @@ module ApplicationCable
       secret = ENV["DEVISE_JWT_SECRET_KEY"].presence ||
                Rails.application.credentials.devise_jwt_secret_key!
 
-      payload = JWT.decode(token, secret, true, algorithms: ["HS256"])
+      payload = JWT.decode(token, secret, true, algorithms: [ "HS256" ])
       jti = payload.dig(0, "jti")
 
       user = User.find_by(jti: jti)

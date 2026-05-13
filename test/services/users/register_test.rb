@@ -38,7 +38,7 @@ class Users::RegisterTest < ActiveSupport::TestCase
   end
 
   test "rolls back on invalid user" do
-    assert_no_difference ["User.count", "Organization.count", "Membership.count"] do
+    assert_no_difference [ "User.count", "Organization.count", "Membership.count" ] do
       assert_raises(ActiveRecord::RecordInvalid) do
         Users::Register.new(
           user_params: { email: "", password: "short" },

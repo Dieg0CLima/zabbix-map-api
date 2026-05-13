@@ -74,7 +74,7 @@ module Zabbix
     end
 
     def database_error_classes
-      classes = [PG::Error]
+      classes = [ PG::Error ]
       classes << Mysql2::Error if defined?(Mysql2::Error)
       classes
     end

@@ -4,7 +4,8 @@ class Devices::MonitoringProfileSync
   end
 
   def call
-    return destroy_profile unless @device.zabbix_host_link.present?
+    host_link = latest_host_link
+    return destroy_profile unless host_link.present?
 
     profile = @device.monitoring_profile || @device.build_monitoring_profile
     profile.synced_at = Time.current
@@ -16,6 +17,11 @@ class Devices::MonitoringProfileSync
 
   def destroy_profile
     @device.monitoring_profile&.destroy
+    @device.association(:monitoring_profile).reset
     nil
+  end
+
+  def latest_host_link
+    @device.zabbix_links.where(resource_type: "host").order(id: :desc).first
   end
 end

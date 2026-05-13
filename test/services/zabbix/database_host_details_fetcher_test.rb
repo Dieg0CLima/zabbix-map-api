@@ -27,8 +27,11 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
       ]
     )
 
-    fake_database_connection = Minitest::Mock.new
-    fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
+    fake_database_connection = Struct.new(:client) do
+      def with_client
+        yield(client, :postgresql)
+      end
+    end.new(fake_client)
 
     fetcher = Zabbix::DatabaseHostDetailsFetcher.new(connection:, hostid: "10668")
 
@@ -44,15 +47,17 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
       assert_equal "Core", payload.dig(:metadata, :groups, 0, :name)
     end
 
-    fake_database_connection.verify
   end
 
   test "raises not found when host is absent in zabbix database" do
     connection = build_connection
     fake_client = FakePgClient.new(host_row: nil, interfaces: [], groups: [], templates: [])
 
-    fake_database_connection = Minitest::Mock.new
-    fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
+    fake_database_connection = Struct.new(:client) do
+      def with_client
+        yield(client, :postgresql)
+      end
+    end.new(fake_client)
 
     fetcher = Zabbix::DatabaseHostDetailsFetcher.new(connection:, hostid: "99999")
 
@@ -60,7 +65,6 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
       assert_raises(Zabbix::DatabaseHostDetailsFetcher::NotFoundError) { fetcher.call }
     end
 
-    fake_database_connection.verify
   end
 
   private
@@ -90,7 +94,7 @@ class Zabbix::DatabaseHostDetailsFetcherTest < ActiveSupport::TestCase
     def exec_params(sql, _params)
       case sql
       when /LEFT JOIN host_inventory/
-        [@host_row].compact
+        [ @host_row ].compact
       when /FROM interface/
         @interfaces
       when /FROM hosts_groups/

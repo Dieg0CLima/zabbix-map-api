@@ -10,8 +10,8 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
       base_url: "https://zabbix.local"
     )
 
-    connection.zabbix_hosts.create!(hostid: "10105", name: "OLT-POP-CENTRO", available: "1")
-    connection.zabbix_hosts.create!(hostid: "10106", name: "router-borda", available: "0")
+    connection.zabbix_hosts.create!(hostid: "10105", name: "OLT-POP-CENTRO", status: "0", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10106", name: "router-borda", status: "0", available: "0")
 
     result = ZabbixConnections::HostDropdownFetcher.new(connection: connection).call
 
@@ -31,8 +31,8 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
       base_url: "https://zabbix.local"
     )
 
-    connection.zabbix_hosts.create!(hostid: "10634", name: "SWCX-001-001-005-CENTRAL", available: "1")
-    connection.zabbix_hosts.create!(hostid: "10106", name: "MikroTik RB260GS by SNMP", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10634", name: "SWCX-001-001-005-CENTRAL", status: "0", available: "1")
+    connection.zabbix_hosts.create!(hostid: "10106", name: "MikroTik RB260GS by SNMP", status: "0", available: "1")
 
     result = ZabbixConnections::HostDropdownFetcher.new(connection: connection, query: "SWCX").call
 
@@ -54,7 +54,7 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
 
     result = ZabbixConnections::HostDropdownFetcher.new(connection: connection).call
 
-    assert_equal ["HOST-ENABLED"], result.map { |row| row[:label] }
+    assert_equal [ "HOST-ENABLED" ], result.map { |row| row[:label] }
   end
 
   test "returns hosts from database fetcher in database mode" do
@@ -77,11 +77,12 @@ class ZabbixConnections::HostDropdownFetcherTest < ActiveSupport::TestCase
       { hostid: "10", name: "Router-1", host: "router-1", status: "0" }
     ])
 
-    Zabbix::DatabaseHostsFetcher.stub(:new, mock_fetcher) do
+    fetcher_factory = ->(**_kwargs) { mock_fetcher }
+    Zabbix::DatabaseHostsFetcher.stub(:new, fetcher_factory) do
       result = ZabbixConnections::HostDropdownFetcher.new(connection: connection, limit: 50, query: "Router").call
 
-      assert_equal ["Router-1", "Switch-1"], result.map { |row| row[:label] }
-      assert_equal true, result.first[:available]
+      assert_equal [ "Router-1", "Switch-1" ], result.map { |row| row[:label] }
+      assert_equal false, result.first[:available]
       assert_equal false, result.last[:available]
     end
 

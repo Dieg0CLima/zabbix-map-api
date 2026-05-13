@@ -51,7 +51,7 @@ module Auth
       def normalize_encryption(value)
         mode = value.to_s.strip.downcase
         return nil if mode.blank? || mode == "plain"
-        return { method: :simple_tls } if mode.in?(["tls", "simple_tls", "ldaps"])
+        return { method: :simple_tls } if mode.in?([ "tls", "simple_tls", "ldaps" ])
         return { method: :start_tls } if mode == "start_tls"
 
         nil

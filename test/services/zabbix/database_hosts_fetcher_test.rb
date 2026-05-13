@@ -14,7 +14,7 @@ class Zabbix::DatabaseHostsFetcherTest < ActiveSupport::TestCase
     ]
 
     fake_client = Minitest::Mock.new
-    fake_client.expect(:exec_params, fake_rows, [String, [100]])
+    fake_client.expect(:exec_params, fake_rows, [ String, [ "%", 100 ] ])
 
     fake_database_connection = Minitest::Mock.new
     fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
@@ -38,11 +38,11 @@ class Zabbix::DatabaseHostsFetcherTest < ActiveSupport::TestCase
     connection = build_connection(db_adapter: "mysql")
 
     fake_statement = Minitest::Mock.new
-    fake_statement.expect(:execute, [{ "hostid" => "500", "host" => "srv-db-01", "name" => "Servidor DB", "status" => "0" }], [200])
+    fake_statement.expect(:execute, [ { "hostid" => "500", "host" => "srv-db-01", "name" => "Servidor DB", "status" => "0" } ], [ "%", "%", "%", 500 ])
     fake_statement.expect(:close, nil)
 
     fake_client = Minitest::Mock.new
-    fake_client.expect(:prepare, fake_statement, [String])
+    fake_client.expect(:prepare, fake_statement, [ String ])
 
     fake_database_connection = Minitest::Mock.new
     fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :mysql) }

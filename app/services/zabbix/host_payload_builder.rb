@@ -63,7 +63,7 @@ class Zabbix::HostPayloadBuilder
     value = @host.available
     return value if value == true || value == false
 
-    value.to_s.strip.downcase.in?(["1", "true", "up", "available", "enabled"])
+    value.to_s.strip.downcase.in?([ "1", "true", "up", "available", "enabled" ])
   end
 
   def interfaces_payload
@@ -131,6 +131,6 @@ class Zabbix::HostPayloadBuilder
   end
 
   def truthy?(value)
-    value == true || value.to_s.strip.downcase.in?(["1", "true", "yes"])
+    value == true || value.to_s.strip.downcase.in?([ "1", "true", "yes" ])
   end
 end

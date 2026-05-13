@@ -5,7 +5,7 @@ module Tenancy
     class << self
       def current_organization(user:, params:)
         if single_tenant_mode?
-          resolve_single_tenant_organization(user: user)
+          resolve_single_tenant_organization(user: user, params: params)
         else
           resolve_multi_tenant_organization(user: user, params: params)
         end
@@ -38,7 +38,15 @@ module Tenancy
         end
       end
 
-      def resolve_single_tenant_organization(user:)
+      def resolve_single_tenant_organization(user:, params:)
+        requested_organization_id = params[:organization_id] || params[:org_id]
+        if requested_organization_id.present?
+          return Organization.find_by(id: requested_organization_id) if user.admin?
+
+          scoped = user.organizations.find_by(id: requested_organization_id)
+          return scoped if scoped.present?
+        end
+
         configured = configured_single_tenant_organization
         return configured if configured.present?
 

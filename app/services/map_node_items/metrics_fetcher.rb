@@ -68,9 +68,9 @@ module MapNodeItems
 
     def metric_values(item, live)
       if live.present?
-        [live["value"], live["clock"]]
+        [ live["value"], live["clock"] ]
       else
-        [item.lastvalue, item.lastclock&.to_i]
+        [ item.lastvalue, item.lastclock&.to_i ]
       end
     end
 

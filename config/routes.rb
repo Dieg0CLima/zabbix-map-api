@@ -73,6 +73,12 @@ Rails.application.routes.draw do
             get :available_device_items
             patch :geometry
           end
+          resource :fusion_diagram, controller: "cable_fusion_diagrams", only: %i[show update] do
+            post :validate
+            post :publish
+            get :snapshots
+            post "snapshots/:snapshot_id/restore", action: :restore_snapshot, as: :restore_snapshot
+          end
           resources :events, controller: "network_cable_events", only: :index
           resources :network_cable_items, only: %i[index create destroy]
         end
@@ -114,6 +120,12 @@ Rails.application.routes.draw do
           member do
             get :available_device_items
             patch :geometry
+          end
+          resource :fusion_diagram, controller: "cable_fusion_diagrams", only: %i[show update] do
+            post :validate
+            post :publish
+            get :snapshots
+            post "snapshots/:snapshot_id/restore", action: :restore_snapshot, as: :restore_snapshot
           end
           resources :events, controller: "network_cable_events", only: :index
           resources :network_cable_items, only: %i[index create destroy]

@@ -138,6 +138,6 @@ class ZabbixItems::SummaryFetcher
   def normalize_limit(value)
     number = value.to_i
     number = DEFAULT_LIMIT if number <= 0
-    [number, MAX_LIMIT].min
+    [ number, MAX_LIMIT ].min
   end
 end

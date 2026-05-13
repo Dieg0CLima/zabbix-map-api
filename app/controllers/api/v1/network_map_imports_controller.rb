@@ -22,7 +22,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       }
     )
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
+    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end
@@ -42,7 +42,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       }
     )
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
+    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end
@@ -54,13 +54,13 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
     )
 
     unless import_status
-      render_errors(status: :not_found, errors: [{ detail: "Import status not found" }])
+      render_errors(status: :not_found, errors: [ { detail: "Import status not found" } ])
       return
     end
 
     render_data(data: import_status)
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
+    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end

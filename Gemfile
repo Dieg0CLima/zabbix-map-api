@@ -47,6 +47,9 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Rails 8 test runner compatibility
+  gem "minitest", "~> 5.25"
 end
 
 gem "devise"

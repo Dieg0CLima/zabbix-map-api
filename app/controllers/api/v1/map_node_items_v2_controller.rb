@@ -52,7 +52,7 @@ class Api::V1::MapNodeItemsV2Controller < Api::V1::BaseController
 
     @map_node_item = @map_node.map_node_items.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
+    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
   end
 
   def permitted_params

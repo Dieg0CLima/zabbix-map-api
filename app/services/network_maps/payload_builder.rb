@@ -321,7 +321,7 @@ module NetworkMaps
     end
 
     def cable_zabbix_status(cable)
-      statuses = [cable.source_node, cable.target_node].compact.map { |node| host_status_label(host_for(node)) }.compact
+      statuses = [ cable.source_node, cable.target_node ].compact.map { |node| host_status_label(host_for(node)) }.compact
       return "unknown" if statuses.empty?
       return "down" if statuses.include?("down")
       return "degraded" if statuses.include?("degraded")

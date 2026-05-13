@@ -70,13 +70,31 @@ class Api::V1::DevicesController < Api::V1::BaseController
 
   def device_params
     raw = params.require(:device)
-    raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
-    raw.permit(:site_id, :name, :hostname, :role, :vendor, :model, :serial_number, :management_ip, :status, :zabbix_connection_id, :zabbix_host_id, metadata: {})
+    attributes = {}
+    allowed_keys = %i[site_id name hostname role vendor model serial_number management_ip status zabbix_connection_id zabbix_host_id]
+    allowed_keys.each { |key| attributes[key] = raw[key] if raw.key?(key) }
+    attributes[:metadata] = normalized_metadata(raw[:metadata]) if raw.key?(:metadata)
+    attributes
   end
 
   def map_context_params
     raw = params.fetch(:map_context, ActionController::Parameters.new)
     raw[:metadata] = {} if raw.key?(:metadata) && raw[:metadata].nil?
     raw.permit(:add_to_map, :network_map_id, :label_override, :color_override, :icon_override, metadata: {}, position: %i[lat lng x y])
+  end
+
+  def normalized_metadata(metadata)
+    return {} if metadata.nil?
+    return {} unless metadata.respond_to?(:to_unsafe_h) || metadata.respond_to?(:to_h)
+
+    hash = metadata.respond_to?(:to_unsafe_h) ? metadata.to_unsafe_h : metadata.to_h
+    hash.deep_transform_values do |value|
+      case value
+      when String, Numeric, TrueClass, FalseClass, NilClass
+        value
+      else
+        value.to_s
+      end
+    end
   end
 end

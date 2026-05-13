@@ -33,5 +33,4 @@ class Api::V1::Users::RegistrationsController < Devise::RegistrationsController
       organization: serialize_organization(result.organization, result.membership&.role)
     }
   end
-
 end

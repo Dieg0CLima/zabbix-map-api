@@ -73,7 +73,7 @@ Rails.application.configure do
   # ActionCable allowed origins — comma-separated list via env var, e.g. "http://10.1.32.62:8085,https://myapp.com"
   # Falls back to allowing all HTTP/HTTPS origins if not set (suitable for internal/dev-prod setups).
   _cable_origins_env = ENV.fetch("ACTION_CABLE_ALLOWED_ORIGINS", "").split(",").map(&:strip).reject(&:empty?)
-  config.action_cable.allowed_request_origins = _cable_origins_env.presence || [/https?:\/\/.*/]
+  config.action_cable.allowed_request_origins = _cable_origins_env.presence || [ /https?:\/\/.*/ ]
 
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false

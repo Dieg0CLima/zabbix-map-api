@@ -10,9 +10,90 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_29_143500) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_30_203000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "cable_fusion_diagrams", force: :cascade do |t|
+    t.bigint "network_cable_id", null: false
+    t.string "status", default: "draft", null: false
+    t.integer "version", default: 0, null: false
+    t.datetime "published_at"
+    t.bigint "published_by_user_id"
+    t.datetime "last_validated_at"
+    t.integer "validation_errors_count", default: 0, null: false
+    t.string "structure_checksum"
+    t.integer "lock_version", default: 0, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["network_cable_id"], name: "index_cable_fusion_diagrams_on_network_cable_id", unique: true
+    t.index ["published_by_user_id"], name: "index_cable_fusion_diagrams_on_published_by_user_id"
+  end
+
+  create_table "cable_fusion_links", force: :cascade do |t|
+    t.bigint "diagram_id", null: false
+    t.string "client_ref"
+    t.bigint "source_port_id", null: false
+    t.bigint "target_port_id", null: false
+    t.string "link_kind", default: "splice", null: false
+    t.string "fiber_side"
+    t.integer "fiber_number"
+    t.string "status", default: "draft", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["diagram_id", "client_ref"], name: "index_cable_fusion_links_on_diagram_id_and_client_ref", unique: true, where: "(client_ref IS NOT NULL)"
+    t.index ["diagram_id", "fiber_side", "fiber_number"], name: "idx_cable_fusion_links_fiber_ref", where: "((fiber_side IS NOT NULL) AND (fiber_number IS NOT NULL))"
+    t.index ["diagram_id"], name: "index_cable_fusion_links_on_diagram_id"
+    t.index ["source_port_id"], name: "index_cable_fusion_links_on_source_port_id"
+    t.index ["target_port_id"], name: "index_cable_fusion_links_on_target_port_id"
+  end
+
+  create_table "cable_fusion_nodes", force: :cascade do |t|
+    t.bigint "diagram_id", null: false
+    t.string "client_ref"
+    t.string "node_type", null: false
+    t.string "label"
+    t.float "x", default: 0.0, null: false
+    t.float "y", default: 0.0, null: false
+    t.float "rotation", default: 0.0, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["diagram_id", "client_ref"], name: "index_cable_fusion_nodes_on_diagram_id_and_client_ref", unique: true, where: "(client_ref IS NOT NULL)"
+    t.index ["diagram_id"], name: "index_cable_fusion_nodes_on_diagram_id"
+  end
+
+  create_table "cable_fusion_ports", force: :cascade do |t|
+    t.bigint "node_id", null: false
+    t.string "client_ref"
+    t.string "name", null: false
+    t.string "port_type", null: false
+    t.integer "capacity", default: 1, null: false
+    t.integer "occupancy_limit", default: 1, null: false
+    t.float "position_x"
+    t.float "position_y"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["node_id", "client_ref"], name: "index_cable_fusion_ports_on_node_id_and_client_ref", unique: true, where: "(client_ref IS NOT NULL)"
+    t.index ["node_id"], name: "index_cable_fusion_ports_on_node_id"
+  end
+
+  create_table "cable_fusion_snapshots", force: :cascade do |t|
+    t.bigint "diagram_id", null: false
+    t.integer "version", null: false
+    t.jsonb "payload", default: {}, null: false
+    t.bigint "created_by_user_id"
+    t.string "reason"
+    t.boolean "published", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_user_id"], name: "index_cable_fusion_snapshots_on_created_by_user_id"
+    t.index ["diagram_id", "version"], name: "index_cable_fusion_snapshots_on_diagram_id_and_version", unique: true
+    t.index ["diagram_id"], name: "index_cable_fusion_snapshots_on_diagram_id"
+  end
 
   create_table "device_interfaces", force: :cascade do |t|
     t.bigint "device_id", null: false
@@ -499,6 +580,15 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_143500) do
     t.index ["zabbix_connection_id"], name: "index_zabbix_links_on_zabbix_connection_id"
   end
 
+  add_foreign_key "cable_fusion_diagrams", "network_cables"
+  add_foreign_key "cable_fusion_diagrams", "users", column: "published_by_user_id"
+  add_foreign_key "cable_fusion_links", "cable_fusion_diagrams", column: "diagram_id"
+  add_foreign_key "cable_fusion_links", "cable_fusion_ports", column: "source_port_id"
+  add_foreign_key "cable_fusion_links", "cable_fusion_ports", column: "target_port_id"
+  add_foreign_key "cable_fusion_nodes", "cable_fusion_diagrams", column: "diagram_id"
+  add_foreign_key "cable_fusion_ports", "cable_fusion_nodes", column: "node_id"
+  add_foreign_key "cable_fusion_snapshots", "cable_fusion_diagrams", column: "diagram_id"
+  add_foreign_key "cable_fusion_snapshots", "users", column: "created_by_user_id"
   add_foreign_key "device_interfaces", "devices"
   add_foreign_key "device_monitoring_items", "device_monitoring_profiles"
   add_foreign_key "device_monitoring_items", "zabbix_items"

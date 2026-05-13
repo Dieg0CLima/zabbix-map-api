@@ -10,7 +10,7 @@ class Api::V1::BaseController < ApplicationController
   def find_record(scope, id)
     scope.find(id)
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [{ detail: "Record not found" }])
+    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
     nil
   end
 end

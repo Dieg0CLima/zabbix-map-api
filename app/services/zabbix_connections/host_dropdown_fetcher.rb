@@ -13,7 +13,7 @@ class ZabbixConnections::HostDropdownFetcher
   end
 
   def call
-    dropdown_hosts.sort_by { |host| [host[:label].to_s.downcase, host[:hostid].to_s] }
+    dropdown_hosts.sort_by { |host| [ host[:label].to_s.downcase, host[:hostid].to_s ] }
   end
 
   private
@@ -57,7 +57,7 @@ class ZabbixConnections::HostDropdownFetcher
   def normalize_limit(limit)
     value = limit.to_i
     value = DEFAULT_LIMIT if value <= 0
-    [value, MAX_LIMIT].min
+    [ value, MAX_LIMIT ].min
   end
 
   def excluded_status?(status)

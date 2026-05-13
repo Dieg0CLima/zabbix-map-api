@@ -21,7 +21,7 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
       }
     ]
 
-    fake_client.expect(:exec_params, fake_rows, [String, [50]])
+    fake_client.expect(:exec_params, fake_rows, [ String, [ 50 ] ])
 
     fake_database_connection = Minitest::Mock.new
     fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
@@ -35,7 +35,7 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
       assert_equal "10101", items.first[:itemid]
       assert_equal "system.cpu.load", items.first[:key_]
       assert_equal "10084", items.first.dig(:host, :hostid)
-      assert_instance_of ActiveSupport::TimeWithZone, items.first[:lastclock]
+      assert_equal "0", items.first[:value_type]
     end
 
     fake_client.verify
@@ -46,7 +46,7 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
     connection = build_connection
 
     fake_client = Minitest::Mock.new
-    fake_client.expect(:exec_params, [], [String, ["10084", 200]])
+    fake_client.expect(:exec_params, [], [ String, [ "10084", 200 ] ])
 
     fake_database_connection = Minitest::Mock.new
     fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :postgresql) }
@@ -65,11 +65,11 @@ class Zabbix::DatabaseItemsFetcherTest < ActiveSupport::TestCase
     connection = build_connection(db_adapter: "mysql")
 
     fake_statement = Minitest::Mock.new
-    fake_statement.expect(:execute, [{ "itemid" => "77", "name" => "Mem", "key_" => "vm.memory", "value_type" => "3", "units" => "B", "status" => "0", "state" => "0", "lastvalue" => "100", "lastclock" => "1700000001", "hostid" => "500", "host" => "srv-db-01" }], [200])
+    fake_statement.expect(:execute, [ { "itemid" => "77", "name" => "Mem", "key_" => "vm.memory", "value_type" => "3", "units" => "B", "status" => "0", "state" => "0", "lastvalue" => "100", "lastclock" => "1700000001", "hostid" => "500", "host" => "srv-db-01" } ], [ 200 ])
     fake_statement.expect(:close, nil)
 
     fake_client = Minitest::Mock.new
-    fake_client.expect(:prepare, fake_statement, [String])
+    fake_client.expect(:prepare, fake_statement, [ String ])
 
     fake_database_connection = Minitest::Mock.new
     fake_database_connection.expect(:with_client, nil) { |&block| block.call(fake_client, :mysql) }

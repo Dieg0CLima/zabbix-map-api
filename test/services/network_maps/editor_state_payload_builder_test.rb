@@ -32,12 +32,12 @@ class NetworkMaps::EditorStatePayloadBuilderTest < ActiveSupport::TestCase
     assert_equal 3, payload[:history_index]
     assert_equal({ "source_id" => "node-a" }, payload[:draft_cable])
 
-    assert_equal ["pop-a"], payload[:pops].map { |item| item[:id] }
-    assert_equal ["node-a"], payload[:markers].map { |item| item[:id] }
-    assert_equal ["cable-a"], payload[:edges].map { |item| item[:id] }
+    assert_equal [ "pop-a" ], payload[:pops].map { |item| item[:id] }
+    assert_equal [ "node-a" ], payload[:markers].map { |item| item[:id] }
+    assert_equal [ "cable-a" ], payload[:edges].map { |item| item[:id] }
 
-    assert_equal [0, 1], payload[:edges].first[:points].map { |point| point[:position] }
-    assert_equal [latest_snapshot.id, old_snapshot.id], payload[:snapshots].map { |snapshot| snapshot[:id] }
+    assert_equal [ 0, 1 ], payload[:edges].first[:points].map { |point| point[:position] }
+    assert_equal [ latest_snapshot.id, old_snapshot.id ], payload[:snapshots].map { |snapshot| snapshot[:id] }
   end
 
   test "returns empty history details when map has no snapshots" do

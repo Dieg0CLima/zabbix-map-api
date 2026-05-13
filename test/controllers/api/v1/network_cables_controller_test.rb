@@ -149,7 +149,8 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     }, as: :json
 
     assert_response :unprocessable_entity
-    error = response.parsed_body.fetch("error")
+    body = response.parsed_body
+    error = body["errors"]&.first || body
     assert_equal "invalid_points", error["code"]
     assert_equal 2, error.dig("details", "min_points")
   end

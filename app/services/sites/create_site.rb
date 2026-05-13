@@ -10,7 +10,7 @@ class Sites::CreateSite
     ActiveRecord::Base.transaction do
       site = @organization.sites.create!(site_attributes)
       marker = attach_to_map(site) if add_to_map?
-      [site, marker]
+      [ site, marker ]
     end
   end
 

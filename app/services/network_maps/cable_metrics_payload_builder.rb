@@ -34,6 +34,7 @@ class NetworkMaps::CableMetricsPayloadBuilder
   def cable_metrics
     cables = @network_map.network_cables
                          .includes(
+                           { cable_fusion_diagram: :links },
                            :source_node,
                            :target_node,
                            { source_node: :zabbix_host },
@@ -62,6 +63,7 @@ class NetworkMaps::CableMetricsPayloadBuilder
       traffic_level: operational[:traffic_level],
       alert_level: operational[:alert_level]
     ).call
+    fusion_metrics = fusion_metrics_for(cable)
 
     {
       id: cable.id,
@@ -72,6 +74,10 @@ class NetworkMaps::CableMetricsPayloadBuilder
       operational_state: operational[:operational_state],
       traffic_level: operational[:traffic_level],
       alert_level: operational[:alert_level],
+      fusion_state: fusion_metrics[:fusion_state],
+      fusion_occupancy_percent: fusion_metrics[:fusion_occupancy_percent],
+      fusion_alerts_count: fusion_metrics[:fusion_alerts_count],
+      fusion_published_version: fusion_metrics[:fusion_published_version],
       visual: visual,
       operational_details: {
         upload_bps: operational[:upload_bps],
@@ -88,6 +94,26 @@ class NetworkMaps::CableMetricsPayloadBuilder
         thresholds: operational[:thresholds]
       },
       items: cable.network_cable_items.map { |ci| build_item(ci) }
+    }
+  end
+
+  def fusion_metrics_for(cable)
+    diagram = cable.cable_fusion_diagram
+    return { fusion_state: "draft", fusion_occupancy_percent: 0.0, fusion_alerts_count: 0, fusion_published_version: 0 } unless diagram
+
+    links_with_fiber = diagram.links.where.not(fiber_side: [ nil, "" ]).where.not(fiber_number: nil).count
+    fiber_count = cable.metadata.to_h["fiber_count"].to_i
+    occupancy_percent = if fiber_count.positive?
+      ((links_with_fiber.to_f / fiber_count) * 100.0).round(2)
+    else
+      0.0
+    end
+
+    {
+      fusion_state: diagram.status,
+      fusion_occupancy_percent: occupancy_percent,
+      fusion_alerts_count: diagram.validation_errors_count.to_i,
+      fusion_published_version: diagram.version.to_i
     }
   end
 

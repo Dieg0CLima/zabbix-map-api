@@ -90,30 +90,54 @@ module Zabbix
       end
     end
 
-    # Single UPDATE with CASE/WHEN — one query regardless of how many items.
+    # Single UPDATE with bind parameters — one query regardless of item count.
     def writeback_bulk(conn_id, updates)
       return if updates.empty?
 
-      ar = Zabbix::Item
-      c  = ar.connection
-
-      itemids = updates.map(&:first)
-
-      lastvalue_cases = updates.map { |id, val, _|   "WHEN #{c.quote(id)} THEN #{c.quote(val)}" }.join(" ")
-      lastclock_cases = updates.map { |id, _, clock| "WHEN #{c.quote(id)} THEN #{c.quote(clock)}" }.join(" ")
-      in_clause       = itemids.map { |id| c.quote(id) }.join(", ")
-
-      sql = <<~SQL.squish
-        UPDATE zabbix_items
-        SET    lastvalue = CASE itemid #{lastvalue_cases} END,
-               lastclock = CASE itemid #{lastclock_cases} END
-        WHERE  itemid IN (#{in_clause})
-          AND  zabbix_connection_id = #{c.quote(conn_id)}
-      SQL
-
-      c.execute(sql)
+      connection = Zabbix::Item.connection
+      updates.each_slice(200) do |batch|
+        statement = build_writeback_statement(connection, conn_id, batch)
+        connection.exec_update(statement[:sql], "ZabbixHistoryCache#writeback_bulk", statement[:binds])
+      end
     rescue StandardError => e
       Rails.logger.debug { "HistoryCache writeback_bulk error: #{e.message}" }
+    end
+
+    def build_writeback_statement(connection, conn_id, updates)
+      itemids = updates.map(&:first)
+      values_placeholders = updates.map { "(?, ?, ?)" }.join(", ")
+      id_placeholders = ([ "?" ] * itemids.length).join(", ")
+
+      sql = <<~SQL.squish
+        UPDATE zabbix_items AS zi
+        SET lastvalue = src.lastvalue,
+            lastclock = src.lastclock
+        FROM (VALUES #{values_placeholders}) AS src(itemid, lastvalue, lastclock)
+        WHERE zi.zabbix_connection_id = ?
+          AND zi.itemid = src.itemid
+          AND zi.itemid IN (#{id_placeholders})
+      SQL
+
+      bind_values = updates.flat_map { |itemid, value, clock| [ itemid.to_s, value.to_s, clock ] }
+      bind_values << conn_id
+      bind_values.concat(itemids)
+
+      {
+        sql: sql,
+        binds: build_binds(connection, bind_values)
+      }
+    end
+
+    def build_binds(connection, values)
+      values.map do |value|
+        type = if value.is_a?(Time) || value.is_a?(ActiveSupport::TimeWithZone)
+                 ActiveRecord::Type::DateTime.new
+        else
+                 ActiveRecord::Type::Value.new
+        end
+
+        ActiveRecord::Relation::QueryAttribute.new(nil, value, type)
+      end
     end
   end
 end

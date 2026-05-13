@@ -5,7 +5,7 @@ class AddPartialUniqueIndexForDeviceZabbixHostLinks < ActiveRecord::Migration[8.
     return unless table_exists?(:zabbix_links)
 
     add_index :zabbix_links,
-              [:linkable_type, :linkable_id, :resource_type],
+              [ :linkable_type, :linkable_id, :resource_type ],
               unique: true,
               where: "linkable_type = 'Device' AND resource_type = 'host'",
               name: INDEX_NAME,

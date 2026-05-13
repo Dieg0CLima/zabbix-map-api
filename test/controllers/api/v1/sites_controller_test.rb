@@ -19,7 +19,7 @@ class Api::V1::SitesControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
     body = JSON.parse(response.body)
     assert_equal [], body["errors"]
-    assert_equal "POP Centro", body.dig("data", "name")
+    assert_equal "POP Centro", body.dig("data", "site", "name")
     assert_equal({}, body["meta"])
   end
 end

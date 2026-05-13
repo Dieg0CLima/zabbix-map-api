@@ -20,7 +20,7 @@ class DeviceMonitoringProfile < ApplicationRecord
   end
 
   def zabbix_connection
-    @zabbix_connection ||= zabbix_host_link&.zabbix_connection
+    zabbix_host_link&.zabbix_connection
   end
 
   def zabbix_hostid
@@ -38,6 +38,6 @@ class DeviceMonitoringProfile < ApplicationRecord
   private
 
   def zabbix_host_link
-    @zabbix_host_link ||= device.zabbix_host_link
+    device.zabbix_links.where(resource_type: "host").order(id: :desc).first
   end
 end

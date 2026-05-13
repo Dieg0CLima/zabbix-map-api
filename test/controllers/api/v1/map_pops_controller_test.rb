@@ -45,7 +45,7 @@ class Api::V1::MapPopsControllerTest < ActionDispatch::IntegrationTest
     assert_equal payload["external_id"], saved_pop.external_id
   end
 
-  test "destroy returns validation error when pop has dependencies" do
+  test "destroy removes pop and keeps dependent nodes" do
     organization = Organization.create!(name: "Org POP Dep")
     user = User.create!(email: "pop.dep@example.com", password: "Password!123", password_confirmation: "Password!123")
     Membership.create!(user:, organization:, role: "editor")
@@ -67,7 +67,8 @@ class Api::V1::MapPopsControllerTest < ActionDispatch::IntegrationTest
       "Authorization" => response.headers["Authorization"]
     }, as: :json
 
-    assert_response :unprocessable_entity
-    assert_equal "VALIDATION_ERROR", response.parsed_body["code"]
+    assert_response :no_content
+    assert_nil network_map.map_pops.find_by(id: pop.id)
+    assert network_map.map_nodes.exists?(external_id: "node-1")
   end
 end

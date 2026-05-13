@@ -70,19 +70,20 @@ class Api::V1::LdapSettingsControllerTest < ActionDispatch::IntegrationTest
         "name" => "Usuário Teste"
       },
       {
-        "sAMAccountName" => ["usuario.teste"],
-        "mail" => ["usuario.teste@mcdtelecom.srv"]
+        "sAMAccountName" => [ "usuario.teste" ],
+        "mail" => [ "usuario.teste@mcdtelecom.srv" ]
       },
       [
         "CN=NOC,OU=Groups,DC=mcdtelecom,DC=srv",
         "CN=Monitoring,OU=Groups,DC=mcdtelecom,DC=srv"
       ],
-      [{ "base_dn" => "dc=mcdtelecom,dc=srv", "filter" => "(sAMAccountName=usuario.teste)", "count" => 0 }],
-      ["cn=usuario.teste,dc=mcdtelecom,dc=srv"]
+      [ { "base_dn" => "dc=mcdtelecom,dc=srv", "filter" => "(sAMAccountName=usuario.teste)", "count" => 0 } ],
+      [ "cn=usuario.teste,dc=mcdtelecom,dc=srv" ]
     )
-    diagnostic = Struct.new(:result) { def call(login:, password:) = result }.new(diagnostic_result)
+    diagnostic = Struct.new(:result) { def call(**_kwargs) = result }.new(diagnostic_result)
 
-    Auth::Ldap::ConnectionDiagnostic.stub :new, diagnostic do
+    diagnostic_factory = ->(**_kwargs) { diagnostic }
+    Auth::Ldap::ConnectionDiagnostic.stub :new, diagnostic_factory do
       post "/api/v1/ldap_settings/test_connection", params: {
         ldap_setting: {
           host: "10.1.32.20",

@@ -104,7 +104,7 @@ module Zabbix
     def normalize_limit(limit)
       value = limit.to_i
       value = DEFAULT_LIMIT if value <= 0
-      [value, MAX_LIMIT].min
+      [ value, MAX_LIMIT ].min
     end
 
     def parse_lastclock(value)

@@ -14,6 +14,7 @@ class NetworkCable < ApplicationRecord
   has_many :network_cable_points, dependent: :destroy
   has_many :network_cable_events, dependent: :destroy
   has_many :network_cable_items, dependent: :destroy
+  has_one :cable_fusion_diagram, class_name: "CableFusion::Diagram", dependent: :destroy, inverse_of: :network_cable
 
   attr_reader :source_site_id, :target_site_id
 
