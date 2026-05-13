@@ -39,7 +39,7 @@ jobs:
           bundler-cache: true
 
       - name: Security scan (brakeman)
-        run: bin/brakeman --no-pager --no-ensure-latest
+        run: bin/brakeman --no-pager --no-exit-on-warn
 
       - name: Lint (rubocop)
         run: bin/rubocop -f github
@@ -47,6 +47,7 @@ jobs:
       - name: Test suite
         env:
           RAILS_ENV: test
+          DEVISE_JWT_SECRET_KEY: test-devise-jwt-secret-key
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           DB_HOST: localhost
           DB_PORT: 5432

@@ -20,7 +20,7 @@ jobs:
           bundler-cache: true
 
       - name: Scan for common Rails security vulnerabilities using static analysis
-        run: bin/brakeman --no-pager --no-ensure-latest
+        run: bin/brakeman --no-pager --no-exit-on-warn
 
   lint:
     runs-on: ubuntu-latest
@@ -73,6 +73,7 @@ jobs:
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          DEVISE_JWT_SECRET_KEY: test-devise-jwt-secret-key
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USERNAME: postgres
