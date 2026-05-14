@@ -49,7 +49,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   # Rails 8 test runner compatibility
-  gem "minitest", "~> 5.25"
+  gem "minitest", "~> 6.0"
 end
 
 gem "devise"

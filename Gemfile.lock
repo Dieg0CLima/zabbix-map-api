@@ -159,7 +159,9 @@ GEM
       net-smtp
     marcel (1.1.0)
     mini_mime (1.1.5)
-    minitest (5.27.0)
+    minitest (6.0.6)
+      drb (~> 2.0)
+      prism (~> 1.5)
     msgpack (1.8.0)
     mysql2 (0.5.7)
       bigdecimal
@@ -366,7 +368,7 @@ DEPENDENCIES
   devise-jwt
   jsonapi-serializer
   kamal
-  minitest (~> 5.25)
+  minitest (~> 6.0)
   mysql2 (~> 0.5.6)
   net-ldap
   pg (~> 1.1)
