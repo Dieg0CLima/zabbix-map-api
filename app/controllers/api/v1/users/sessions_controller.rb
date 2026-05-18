@@ -49,7 +49,7 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
     }, status: :ok
   end
 
-  def respond_to_on_destroy
+  def respond_to_on_destroy(*)
     if current_user
       render json: { message: "Logged out successfully." }, status: :ok
     else
