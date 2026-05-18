@@ -7,6 +7,7 @@ Rails.application.routes.draw do
         registrations: "api/v1/users/registrations",
         sessions: "api/v1/users/sessions"
       }
+      delete "logout", to: "users/sessions#destroy"
 
       get "me", to: "me#show"
 

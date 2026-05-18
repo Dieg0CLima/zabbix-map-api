@@ -26,6 +26,11 @@ if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   if is_truthy "${RUN_DB_SEED:-}"; then
     ./bin/rails db:seed
   fi
+
+  # Optional master-user bootstrap (idempotent)
+  if [ -n "${MASTER_USER_EMAIL:-}" ] && [ -n "${MASTER_USER_PASSWORD:-}" ]; then
+    ./bin/rails bootstrap:ensure_master_user
+  fi
 fi
 
 exec "${@}"

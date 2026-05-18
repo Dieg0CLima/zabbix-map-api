@@ -73,6 +73,35 @@ Variáveis comuns para AD:
 - `LDAP_ATTR_EMAIL` (padrão `mail`)
 - `LDAP_ATTR_NAME` (padrão `displayName`)
 
+## Bootstrap do usuário master (produção)
+
+A API suporta bootstrap idempotente de usuário master/global admin no startup do container.
+
+Defina no ambiente:
+
+- `MASTER_USER_EMAIL`
+- `MASTER_USER_PASSWORD`
+
+Quando ambos estiverem definidos, o entrypoint executa:
+
+```bash
+bin/rails bootstrap:ensure_master_user
+```
+
+Comportamento:
+
+- cria o usuário se não existir;
+- promove `admin=true`;
+- atualiza senha quando já existe.
+
+Também é possível executar manualmente:
+
+```bash
+MASTER_USER_EMAIL=admin@empresa.com \
+MASTER_USER_PASSWORD='senha-forte' \
+bin/rails bootstrap:ensure_master_user
+```
+
 ## Consulta de hosts e itens do Zabbix
 
 Os endpoints `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_hosts` e `GET /api/v1/zabbix_connections/:zabbix_connection_id/zabbix_items` suportam leitura direta no banco do Zabbix quando a conexão estiver em modo `database` ou `hybrid`:
