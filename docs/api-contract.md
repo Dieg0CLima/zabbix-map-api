@@ -21,12 +21,12 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 - enviar sempre `Authorization: Bearer <token>` nas chamadas autenticadas.
 - o token JWT expira em `4 horas` a partir do login.
 - a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
-- no modo `single`, o login pode ser feito sem `organization_id`; a organização local é resolvida pelo backend.
+- o login (`POST /api/v1/users/sign_in`) retorna apenas identidade (`id`, `email`, `admin`) e token, sem contexto de organização no payload.
 - com LDAP habilitado (`config/ldap.yml`), o login aceita `user.login` (ex.: `sAMAccountName`) além de `user.email`; fallback para autenticação local depende de `fallback_to_database_auth`.
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
-Também existe suporte a **admin global** (`users.admin = true`), que pode operar sem vínculo de membership e atuar em qualquer organização ao informar `organization_id` na requisição.
+Também existe suporte a **admin global** (`users.admin = true`) para operações administrativas do sistema.
 
 ---
 
@@ -62,6 +62,42 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/network_maps/:id/cable_metrics`
 
 ### Configuração LDAP / Active Directory
+
+### Gestão de usuários (Admin)
+
+- `GET /api/v1/admin/users`
+- `PATCH /api/v1/admin/users/:id`
+- `PATCH /api/v1/admin/users/:id/reset_password`
+
+Regras:
+- endpoints exigem autenticação;
+- acesso permitido apenas para `admin` global;
+- listagem retorna `authentication_source` (`local` ou `ldap`) e `ldap_managed`;
+- `PATCH /reset_password` só funciona para usuários `local`;
+- usuários `ldap` devem trocar senha no Active Directory e a API retorna `422 INVALID_OPERATION` ao tentar reset local.
+
+Payload de update (`PATCH /api/v1/admin/users/:id`):
+
+```json
+{
+  "user": {
+    "email": "novo-email@empresa.com",
+    "admin": false,
+    "membership_role": "editor"
+  }
+}
+```
+
+Payload de reset de senha (`PATCH /api/v1/admin/users/:id/reset_password`):
+
+```json
+{
+  "user": {
+    "password": "NovaSenhaForte!123",
+    "password_confirmation": "NovaSenhaForte!123"
+  }
+}
+```
 
 - `GET /api/v1/ldap_settings`
 - `PUT /api/v1/ldap_settings`

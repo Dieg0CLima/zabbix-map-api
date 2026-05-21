@@ -11,6 +11,14 @@ Rails.application.routes.draw do
 
       get "me", to: "me#show"
 
+      namespace :admin do
+        resources :users, only: %i[index update] do
+          member do
+            patch :reset_password
+          end
+        end
+      end
+
       resources :projects, controller: "network_projects" do
         member do
           put :save

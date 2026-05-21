@@ -21,34 +21,21 @@ class ApplicationController < ActionController::API
   end
 
   def current_membership
-    return if current_organization.blank?
-
-    @current_membership ||= current_user.membership_for(current_organization.id)
+    @current_membership ||= current_user&.memberships&.includes(:organization)&.order(:id)&.first
   end
 
   def ensure_organization_access!
-    if Tenancy::Resolver.single_tenant_mode?
-      return if current_organization.present?
-
-      render json: { error: "Organization not configured for this installation" }, status: :service_unavailable
-      return
-    end
-
-    return if current_user.admin? && params[:organization_id].blank? && params[:org_id].blank?
     return if current_organization.present?
 
-    render json: { error: "Organization not found for current user" }, status: :not_found
+    render json: { error: "Organization not configured for this installation" }, status: :service_unavailable
   end
 
   def admin_without_organization_context?
-    current_user.admin? && current_organization.blank?
+    false
   end
 
   def ensure_organization_context_for_creation!
-    return false unless admin_without_organization_context?
-
-    render json: { error: "organization_id is required for this action" }, status: :bad_request
-    true
+    false
   end
 
   def require_editor_or_admin!

@@ -6,7 +6,6 @@ class Api::V1::NetworkMapSerializer
   def as_json(*)
     {
       id: @network_map.id,
-      organization_id: @network_map.organization_id,
       name: @network_map.name,
       description: @network_map.description,
       metadata: @network_map.metadata,
