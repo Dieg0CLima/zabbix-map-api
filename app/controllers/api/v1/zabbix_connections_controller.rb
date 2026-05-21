@@ -17,8 +17,6 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   end
 
   def create
-    return if ensure_organization_context_for_creation!
-
     connection = ZabbixConnections::Create.new(
       organization: current_organization,
       payload: zabbix_connection_params
@@ -54,7 +52,6 @@ class Api::V1::ZabbixConnectionsController < ApplicationController
   def zabbix_connection_params
     attrs = params.require(:zabbix_connection).permit(
       :name,
-      :organization_id,
       :status,
       :base_url,
       :api_token,

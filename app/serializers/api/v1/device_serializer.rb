@@ -6,7 +6,6 @@ class Api::V1::DeviceSerializer
   def as_json(*)
     {
       id: @device.id,
-      organization_id: @device.organization_id,
       site_id: @device.site_id,
       name: @device.name,
       hostname: @device.hostname,

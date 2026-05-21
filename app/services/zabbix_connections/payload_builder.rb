@@ -7,7 +7,6 @@ module ZabbixConnections
     def call
       {
         id: @connection.id,
-        organization_id: @connection.organization_id,
         name: @connection.name,
         status: @connection.status,
         base_url: @connection.base_url,

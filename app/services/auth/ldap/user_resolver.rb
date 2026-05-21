@@ -8,14 +8,18 @@ module Auth
       def call(email:, login:, name: nil)
         resolved_email = resolve_email(email:, login:)
         user = User.find_by(email: resolved_email)
-        return user if user.present?
+        if user.present?
+          user.update!(authentication_source: "ldap") unless user.ldap_managed?
+          return user
+        end
         return nil unless @config.allow_sign_up?
 
         password = SecureRandom.base58(24)
         User.create!(
           email: resolved_email,
           password:,
-          password_confirmation: password
+          password_confirmation: password,
+          authentication_source: "ldap"
         )
       end
 

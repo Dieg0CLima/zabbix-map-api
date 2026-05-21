@@ -6,7 +6,6 @@ class Api::V1::MeController < ApplicationController
       data: {
         id: current_user.id,
         email: current_user.email,
-        org_id: current_user.current_organization&.id,
         admin: current_user.admin?
       }
     }, status: :ok

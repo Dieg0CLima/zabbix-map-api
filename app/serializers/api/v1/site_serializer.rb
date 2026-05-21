@@ -6,7 +6,6 @@ class Api::V1::SiteSerializer
   def as_json(*)
     {
       id: @site.id,
-      organization_id: @site.organization_id,
       name: @site.name,
       slug: @site.slug,
       description: @site.description,

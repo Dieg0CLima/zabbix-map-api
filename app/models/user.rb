@@ -7,8 +7,12 @@ class User < ApplicationRecord
          :recoverable, :rememberable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: self
 
+  AUTHENTICATION_SOURCES = %w[local ldap].freeze
+
   has_many :memberships, dependent: :destroy
   has_many :organizations, through: :memberships
+
+  validates :authentication_source, inclusion: { in: AUTHENTICATION_SOURCES }
 
   def current_organization
     memberships.includes(:organization).first&.organization
@@ -20,5 +24,9 @@ class User < ApplicationRecord
 
   def admin?
     admin
+  end
+
+  def ldap_managed?
+    authentication_source == "ldap"
   end
 end

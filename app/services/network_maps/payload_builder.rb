@@ -55,7 +55,6 @@ module NetworkMaps
     def base_payload
       {
         id: @network_map.id,
-        organization_id: @network_map.organization_id,
         name: @network_map.name,
         description: @network_map.description,
         source_type: @network_map.source_type,

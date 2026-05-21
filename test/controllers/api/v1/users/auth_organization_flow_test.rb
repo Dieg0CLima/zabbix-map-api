@@ -24,7 +24,7 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     assert_equal "admin", organization["role"]
   end
 
-  test "sign in returns selected organization payload" do
+  test "sign in returns identity payload without organization context" do
     user = User.create!(
       email: "member@example.com",
       password: "Password!123",
@@ -40,40 +40,6 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     post "/api/v1/users/sign_in", params: {
       user: {
         email: user.email,
-        password: "Password!123",
-        organization_id: second_org.id
-      }
-    }, as: :json
-
-    assert_response :ok
-    assert response.headers["Authorization"].present?
-
-    payload = response.parsed_body.fetch("data")
-    organization = payload.fetch("organization")
-
-    assert_equal second_org.id, payload["org_id"]
-    assert_equal second_org.id, organization["id"]
-    assert_equal "Org Two", organization["name"]
-    assert_equal "org-two", organization["slug"]
-    assert_equal "editor", organization["role"]
-  end
-
-  test "sign in resolves organization in single-tenant mode without organization_id" do
-    user = User.create!(
-      email: "single-tenant@example.com",
-      password: "Password!123",
-      password_confirmation: "Password!123"
-    )
-
-    org = Organization.create!(name: "Single Tenant Org")
-    Membership.create!(user:, organization: org, role: "admin")
-
-    original_mode = ENV["TENANCY_MODE"]
-    ENV["TENANCY_MODE"] = "single"
-
-    post "/api/v1/users/sign_in", params: {
-      user: {
-        email: user.email,
         password: "Password!123"
       }
     }, as: :json
@@ -82,9 +48,11 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     assert response.headers["Authorization"].present?
 
     payload = response.parsed_body.fetch("data")
-    assert_equal org.id, payload["org_id"]
-  ensure
-    ENV["TENANCY_MODE"] = original_mode
+    assert_equal user.id, payload["id"]
+    assert_equal user.email, payload["email"]
+    assert_equal false, payload["admin"]
+    assert_not payload.key?("org_id")
+    assert_not payload.key?("organization")
   end
 
   test "sign in authenticates via ldap when enabled" do
@@ -110,8 +78,7 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
           post "/api/v1/users/sign_in", params: {
             user: {
               login: "ldap.user",
-              password: "Password!123",
-              organization_id: org.id
+              password: "Password!123"
             }
           }, as: :json
         end
@@ -122,10 +89,10 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     assert response.headers["Authorization"].present?
     payload = response.parsed_body.fetch("data")
     assert_equal user.email, payload["email"]
-    assert_equal org.id, payload["org_id"]
+    assert_not payload.key?("org_id")
   end
 
-  test "sign in via ldap works without email attribute using login mapping in single-tenant mode" do
+  test "sign in via ldap works without email attribute using login mapping" do
     org = Organization.create!(name: "LDAP Single Org")
     ldap_user = User.create!(
       email: "ldap-diego.lima@local.invalid",
@@ -139,9 +106,6 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
 
     authenticator = Struct.new(:result) { def call(**_kwargs) = result }.new(auth_result)
     resolver = Struct.new(:user) { def call(**_kwargs) = user }.new(ldap_user)
-
-    original_mode = ENV["TENANCY_MODE"]
-    ENV["TENANCY_MODE"] = "single"
 
     Auth::Ldap::Config.stub :current, ldap_config do
       authenticator_factory = ->(**_kwargs) { authenticator }
@@ -161,9 +125,7 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     assert_response :ok
     payload = response.parsed_body.fetch("data")
     assert_equal ldap_user.email, payload["email"]
-    assert_equal org.id, payload["org_id"]
-  ensure
-    ENV["TENANCY_MODE"] = original_mode
+    assert_not payload.key?("org_id")
   end
 
   test "sign in returns unauthorized when ldap fails and fallback is disabled" do
