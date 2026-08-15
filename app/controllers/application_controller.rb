@@ -27,7 +27,11 @@ class ApplicationController < ActionController::API
   def ensure_organization_access!
     return if current_organization.present?
 
-    render json: { error: "Organization not configured for this installation" }, status: :service_unavailable
+    render_api_error(
+      code: "SERVICE_UNAVAILABLE",
+      message: "Organization not configured for this installation",
+      status: :service_unavailable
+    )
   end
 
   def admin_without_organization_context?
@@ -42,7 +46,15 @@ class ApplicationController < ActionController::API
     return if current_user.admin?
     return if current_membership&.role.in?(%w[admin editor])
 
-    render json: { error: "Insufficient permissions" }, status: :forbidden
+    render_forbidden_error
+  end
+
+  def render_forbidden_error(message: "Insufficient permissions")
+    render_api_error(code: "FORBIDDEN", message:, status: :forbidden)
+  end
+
+  def render_not_found_error(message:)
+    render_api_error(code: "NOT_FOUND", message:, status: :not_found)
   end
 
   def render_validation_error(record_or_details, message: "Payload inválido")
@@ -52,10 +64,28 @@ class ApplicationController < ActionController::API
       record_or_details
     end
 
-    render json: {
-      code: "VALIDATION_ERROR",
-      message:,
-      details:
-    }, status: :unprocessable_entity
+    render_api_error(code: "VALIDATION_ERROR", message:, details:, status: :unprocessable_entity)
+  end
+
+  def render_api_error(code:, message:, status:, details: nil, errors: nil, meta: {})
+    normalized_errors = errors || [
+      {
+        code:,
+        detail: message,
+        meta: details.nil? ? {} : { details: }
+      }
+    ]
+
+    payload = {
+      data: nil,
+      meta:,
+      errors: normalized_errors,
+      code:,
+      message: message,
+      error: message
+    }
+    payload[:details] = details unless details.nil?
+
+    render json: payload, status:
   end
 end

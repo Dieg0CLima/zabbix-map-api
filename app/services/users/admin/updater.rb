@@ -9,16 +9,30 @@ class Users::Admin::Updater
   def call
     ActiveRecord::Base.transaction do
       @user.update!(user_attributes) if user_attributes.any?
-      membership&.update!(role: membership_role) if membership_role.present?
+      target_membership&.update!(role: membership_role) if membership_role.present?
     end
 
-    Result.new(user: @user, membership: membership)
+    Result.new(user: @user, membership: target_membership)
   end
 
   private
 
-  def membership
-    @membership ||= @user.memberships.order(:id).first
+  def target_membership
+    @target_membership ||= begin
+      return if membership_role.blank?
+
+      if @params[:organization_id].present?
+        membership = @user.memberships.find_by(organization_id: @params[:organization_id])
+        raise ArgumentError, "Membership not found for organization" if membership.blank?
+
+        membership
+      else
+        memberships = @user.memberships.order(:id)
+        return memberships.first if memberships.one?
+
+        raise ArgumentError, "organization_id is required when user has memberships in multiple organizations"
+      end
+    end
   end
 
   def user_attributes

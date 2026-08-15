@@ -231,7 +231,7 @@ class Api::V1::LdapSettingsController < ApplicationController
     return if current_user.admin?
     return if current_membership&.role == "admin"
 
-    render json: { error: "Insufficient permissions" }, status: :forbidden
+    render_forbidden_error
   end
 
   def sanitize_for_json(value)

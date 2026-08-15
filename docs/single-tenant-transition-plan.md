@@ -11,9 +11,9 @@ Migrar esta API para operar como **single-tenant por instalação** (um cliente 
   - `TENANCY_MODE` suportado com default `multi`;
   - `ApplicationController#current_organization` delegando para o resolver.
 - Avanços já aplicados:
-  - `SessionsController` agora resolve organização via `Tenancy::Resolver` no modo `single` (sem exigir `organization_id`);
+  - `SessionsController` aceita login sem `organization_id` no modo `single`;
   - login possui fallback explícito de emissão de JWT quando `warden-jwt_auth.token` não vier preenchido.
-- Com `TENANCY_MODE=multi`, o comportamento permanece compatível com o fluxo atual.
+- Com `TENANCY_MODE=multi`, o comportamento segue compatível com o fluxo atual de seleção por organização.
 
 ## Contexto atual
 
@@ -69,7 +69,7 @@ Objetivo:
 
 Mudanças:
 - `organization_id` deixa de ser obrigatório no backend quando `TENANCY_MODE=single`.
-- se `organization_id` vier na request, ele é ignorado (ou validado apenas para compatibilidade).
+- se `organization_id` vier na request, ele é aceito apenas para compatibilidade.
 - `ensure_organization_access!` passa a validar apenas existência do tenant local + autenticação.
 - `admin_without_organization_context?` torna-se irrelevante no modo single.
 

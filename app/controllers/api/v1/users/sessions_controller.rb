@@ -3,10 +3,10 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
   respond_to :json
   before_action :configure_sign_in_params, only: :create
 
-  def create
-    ldap_config = Auth::Ldap::Config.current
-    return super unless ldap_config.enabled?
+def create
+  ldap_config = Auth::Ldap::Config.current
 
+  if ldap_config.enabled?
     login = params.dig(:user, :email).presence || params.dig(:user, :login).to_s
     password = params.dig(:user, :password).to_s
 
@@ -23,11 +23,11 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
       sign_in(resource_name, user)
       return respond_with(user)
     end
-
-    return super if ldap_config.fallback_to_database_auth?
-
-    render_invalid_login
   end
+
+  authenticate_database_user
+end
+
 
   private
 
@@ -48,7 +48,11 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
     if current_user
       render json: { message: "Logged out successfully." }, status: :ok
     else
-      render json: { message: "Couldn't find an active session." }, status: :unauthorized
+      render_api_error(
+        code: "INVALID_SESSION",
+        message: "Couldn't find an active session.",
+        status: :unauthorized
+      )
     end
   end
 
@@ -61,9 +65,24 @@ class Api::V1::Users::SessionsController < Devise::SessionsController
     nil
   end
 
-  def render_invalid_login
-    render json: { error: "Invalid email or password" }, status: :unauthorized
+def authenticate_database_user
+  user = warden.authenticate(auth_options)
+
+  if user
+    sign_in(resource_name, user)
+    respond_with(user)
+  else
+    render_invalid_login
   end
+end
+
+def render_invalid_login
+  render_api_error(
+    code: "INVALID_CREDENTIALS",
+    message: "Invalid email or password",
+    status: :unauthorized
+  )
+end
 
   def configure_sign_in_params
     devise_parameter_sanitizer.permit(:sign_in, keys: [ :login ])

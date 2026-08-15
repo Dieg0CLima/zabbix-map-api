@@ -7,7 +7,7 @@ class Api::V1::Admin::UsersController < ApplicationController
     users = User.includes(:memberships).order(:email)
 
     render json: {
-      data: users.map { |user| user_payload(user) }
+      data: users.map { |user| Users::Admin::PayloadBuilder.new(user: user).call }
     }, status: :ok
   end
 
@@ -17,9 +17,11 @@ class Api::V1::Admin::UsersController < ApplicationController
       params: user_update_params
     ).call
 
-    render json: { data: user_payload(result.user) }, status: :ok
+    render json: { data: Users::Admin::PayloadBuilder.new(user: result.user).call }, status: :ok
   rescue ActiveRecord::RecordInvalid => e
     render_validation_error(e.record, message: "Falha ao atualizar usuário")
+  rescue ArgumentError => e
+    render json: { code: "INVALID_OPERATION", message: e.message }, status: :unprocessable_entity
   end
 
   def reset_password
@@ -41,18 +43,18 @@ class Api::V1::Admin::UsersController < ApplicationController
   def require_global_admin!
     return if current_user.admin?
 
-    render json: { error: "Insufficient permissions" }, status: :forbidden
+    render_forbidden_error
   end
 
   def set_user
     @user = User.find_by(id: params[:id])
     return if @user.present?
 
-    render json: { error: "User not found" }, status: :not_found
+    render_not_found_error(message: "User not found")
   end
 
   def user_update_params
-    permitted = params.require(:user).permit(:email, :membership_role).to_h.symbolize_keys
+    permitted = params.require(:user).permit(:email, :membership_role, :organization_id).to_h.symbolize_keys
 
     if params.require(:user).key?(:admin)
       permitted[:admin] = ActiveModel::Type::Boolean.new.cast(params.require(:user)[:admin])
@@ -63,22 +65,5 @@ class Api::V1::Admin::UsersController < ApplicationController
 
   def reset_password_params
     params.require(:user).permit(:password, :password_confirmation)
-  end
-
-  def user_payload(user)
-    memberships = user.memberships.order(:id)
-
-    {
-      id: user.id,
-      email: user.email,
-      admin: user.admin?,
-      authentication_source: user.authentication_source,
-      ldap_managed: user.ldap_managed?,
-      memberships: memberships.map { |membership| { organization_id: membership.organization_id, role: membership.role } },
-      membership: {
-        organization_id: memberships.first&.organization_id,
-        role: memberships.first&.role
-      }
-    }
   end
 end
