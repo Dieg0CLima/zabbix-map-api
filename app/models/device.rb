@@ -1,7 +1,7 @@
 class Device < ApplicationRecord
   require "securerandom"
 
-  ROLES = %w[generic router switch firewall gateway server endpoint olt cto splitter].freeze
+  ROLES = %w[generic router switch firewall gateway server endpoint olt cto splitter dwdm dci].freeze
   STATUSES = %w[planned active maintenance offline decommissioned].freeze
 
   belongs_to :organization
