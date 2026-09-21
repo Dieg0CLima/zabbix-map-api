@@ -49,7 +49,7 @@ class Api::V1::MapSiteMarkersControllerTest < ActionDispatch::IntegrationTest
   test "bulk_create reports items that fail instead of hiding them" do
     post "/api/v1/network_maps/#{@network_map.id}/site_markers/bulk_create", params: {
       organization_id: @organization.id,
-      items: [{ site_id: 0, position: { lat: 1, lng: 2 } }]
+      items: [ { site_id: 0, position: { lat: 1, lng: 2 } } ]
     }, headers: @auth_headers, as: :json
 
     assert_response :success
