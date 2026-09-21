@@ -85,6 +85,29 @@ class Api::V1::CableFusionDiagramsControllerTest < ActionDispatch::IntegrationTe
     assert_equal true, data.dig("validation", "is_valid")
   end
 
+  test "destroying a cable removes a diagram whose links reference its ports" do
+    put "/api/v1/network_maps/#{@network_map.id}/network_cables/#{@cable.id}/fusion_diagram", params: {
+      organization_id: @organization.id,
+      fusion_diagram: {
+        nodes: [ { client_id: "node-1", type: "dio", label: "DIO A", x: 10, y: 20, rotation: 0 } ],
+        ports: [
+          { client_id: "port-in", node_client_id: "node-1", name: "IN-01", port_type: "fiber_in", capacity: 1, occupancy_limit: 1 },
+          { client_id: "port-out", node_client_id: "node-1", name: "OUT-01", port_type: "fiber_out", capacity: 1, occupancy_limit: 1 }
+        ],
+        links: [ { client_id: "link-1", source_port_client_id: "port-in", target_port_client_id: "port-out", link_kind: "splice", fiber_number: 1 } ]
+      }
+    }, headers: auth_headers, as: :json
+    assert_response :ok
+    assert_equal 1, CableFusion::Link.count
+
+    assert_difference -> { CableFusion::Diagram.count }, -1 do
+      @network_map.destroy!
+    end
+    assert_equal 0, CableFusion::Link.count
+    assert_equal 0, CableFusion::Port.count
+    assert_equal 0, CableFusion::Node.count
+  end
+
   test "validate reports conflicts for duplicated fiber reference" do
     diagram = CableFusion::LoadDiagram.new(cable: @cable).call
     node = diagram.nodes.create!(node_type: "dio", label: "DIO", x: 1, y: 1, rotation: 0)
