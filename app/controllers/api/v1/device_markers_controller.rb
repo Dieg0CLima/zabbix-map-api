@@ -63,6 +63,6 @@ class Api::V1::DeviceMarkersController < Api::V1::BaseController
   end
 
   def bulk_items
-    params.fetch(:items, []).map { |item| item.to_unsafe_h.symbolize_keys }
+    params.fetch(:items, []).map { |item| item.to_unsafe_h.deep_symbolize_keys }
   end
 end
