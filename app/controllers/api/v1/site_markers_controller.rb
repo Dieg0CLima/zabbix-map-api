@@ -58,8 +58,14 @@ class Api::V1::SiteMarkersController < Api::V1::BaseController
       label_override: params[:label_override] || params.dig(:site_marker, :label_override),
       color: params[:color_override] || params.dig(:site_marker, :color_override),
       icon: params[:icon_override] || params.dig(:site_marker, :icon_override),
-      metadata: (params[:metadata] || params.dig(:site_marker, :metadata) || {}).merge("locked" => params[:locked] || params.dig(:site_marker, :locked))
+      metadata: marker_metadata.merge("locked" => params[:locked] || params.dig(:site_marker, :locked))
     }.compact
+  end
+
+  # JSON `{}` arrives as unpermitted ActionController::Parameters, which cannot be merged into a Hash later on.
+  def marker_metadata
+    raw = params[:metadata] || params.dig(:site_marker, :metadata) || {}
+    raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw.to_h
   end
 
   def bulk_items

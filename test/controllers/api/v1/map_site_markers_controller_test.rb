@@ -65,7 +65,7 @@ class Api::V1::MapSiteMarkersControllerTest < ActionDispatch::IntegrationTest
     marker_id = JSON.parse(response.body).dig("data", "id")
 
     patch "/api/v1/network_maps/#{@network_map.id}/site_markers/#{marker_id}", params: {
-      organization_id: @organization.id, label_override: "Rótulo", color_override: "#ff0000", position: { lat: 11, lng: 21 }
+      organization_id: @organization.id, label_override: "Rótulo", color_override: "#ff0000", position: { lat: 11, lng: 21 }, metadata: {}, locked: false
     }, headers: @auth_headers, as: :json
 
     assert_response :success
