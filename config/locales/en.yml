@@ -42,6 +42,8 @@ en:
       olt: "OLT"
       cto: "CTO"
       splitter: "Splitter"
+      dwdm: "DWDM"
+      dci: "DCI"
       planned: "Planejado"
       active: "Ativo"
       maintenance: "Em manutenção"

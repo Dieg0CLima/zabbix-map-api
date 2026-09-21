@@ -11,7 +11,7 @@ class Api::V1::SitesController < Api::V1::BaseController
   def dropdown
     sites = current_organization.sites.order(:name)
     sites = sites.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
-    render_data(data: sites.limit(50).map { |site| { value: site.id, label: site.name, code: site.slug, meta: { slug: site.slug } } })
+    render_data(data: sites.limit(50).map { |site| Sites::DropdownPayloadBuilder.new(site).call })
   end
 
   def show

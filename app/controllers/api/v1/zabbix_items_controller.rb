@@ -36,18 +36,12 @@ class Api::V1::ZabbixItemsController < ApplicationController
   end
 
   def dropdown
-    items = @zabbix_connection.zabbix_items.order(:name)
-    items = items.where(zabbix_host_id: params[:zabbix_host_id]) if params[:zabbix_host_id].present?
-    data = items.map do |i|
-      {
-        value: i.id,
-        label: "#{i.name} (#{i.key_})",
-        itemid: i.itemid,
-        units: i.units,
-        value_type: i.value_type
-      }
-    end
-    render json: { data: data }, status: :ok
+    result = ZabbixItems::DropdownFetcher.new(
+      connection: @zabbix_connection,
+      zabbix_host_id: params[:zabbix_host_id]
+    ).call
+
+    render json: { data: result.items, meta: result.meta }, status: :ok
   end
 
   private

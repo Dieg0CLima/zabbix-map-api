@@ -152,7 +152,7 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     body = response.parsed_body
     error = body["errors"]&.first || body
     assert_equal "invalid_points", error["code"]
-    assert_equal 2, error.dig("details", "min_points")
+    assert_equal 2, body.dig("details", "min_points")
   end
 
   test "geometry remove_segment updates points and returns geometry_version" do
@@ -225,7 +225,13 @@ class Api::V1::NetworkCablesControllerTest < ActionDispatch::IntegrationTest
     }, as: :json
 
     assert_response :conflict
-    assert_equal "geometry_conflict", response.parsed_body["code"]
+    body = response.parsed_body
+    assert_nil body["data"]
+    assert_equal "geometry_conflict", body["code"]
+    assert_equal "Geometry version conflict", body["message"]
+    assert_equal "Geometry version conflict", body["error"]
+    assert_equal 1, body.dig("details", "expected_version")
+    assert_equal 2, body.dig("details", "current_version")
   end
 
   test "geometry attach_endpoint_to_pop rebinds endpoint and snaps terminal point" do

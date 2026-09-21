@@ -9,20 +9,9 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
   def preview
     result = run_import(mode: "preview")
 
-    render_data(
-      data: {
-        summary: result.summary,
-        report: result.report,
-        normalized_payload: result.normalized_payload,
-        warnings: Array(result.warnings),
-        target_map: {
-          action: result.summary[:map],
-          network_map_id: result.network_map&.id
-        }
-      }
-    )
+    render_data(data: response_builder(result: result).preview_payload)
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
+    render_not_found_error(message: "Record not found")
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end
@@ -32,17 +21,9 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
 
     result = run_import(mode: "apply")
 
-    render_data(
-      data: {
-        summary: result.summary,
-        report: result.report,
-        warnings: Array(result.warnings),
-        network_map_id: result.network_map.id,
-        network_map_name: result.network_map.name
-      }
-    )
+    render_data(data: response_builder(result: result).apply_payload)
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
+    render_not_found_error(message: "Record not found")
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end
@@ -54,13 +35,13 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
     )
 
     unless import_status
-      render_errors(status: :not_found, errors: [ { detail: "Import status not found" } ])
+      render_not_found_error(message: "Import status not found")
       return
     end
 
-    render_data(data: import_status)
+    render_data(data: response_builder(import_status: import_status).status_payload)
   rescue ActiveRecord::RecordNotFound
-    render_errors(status: :not_found, errors: [ { detail: "Record not found" } ])
+    render_not_found_error(message: "Record not found")
   rescue Maps::Import::Errors::DomainError => e
     render_domain_error(e)
   end
@@ -76,6 +57,15 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       network_map: target_network_map,
       import_id: params[:import_id].to_s.presence
     ).call
+  end
+
+  def response_builder(result: nil, import_status: nil, import_id: nil)
+    Maps::Import::ResponseBuilder.new(
+      result: result,
+      import_status: import_status,
+      import_id: import_id,
+      provider: provider_param
+    )
   end
 
   def provider_param
@@ -112,12 +102,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
     )
 
     render_data(
-      data: {
-        import_id: import_id,
-        status: "queued",
-        provider: provider_param,
-        poll_url: "/api/v1/network_maps/imports/#{import_id}/status"
-      },
+      data: response_builder(import_id: import_id).queued_payload,
       status: :accepted
     )
   end

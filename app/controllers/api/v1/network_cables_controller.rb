@@ -68,11 +68,12 @@ class Api::V1::NetworkCablesController < ApplicationController
 
     render json: { data: cable_payload(cable) }, status: :ok
   rescue NetworkCables::Errors::GeometryConflict => e
-    render json: {
+    render_api_error(
       code: e.code,
       message: e.message,
-      details: e.details
-    }, status: :conflict
+      details: e.details,
+      status: :conflict
+    )
   rescue NetworkCables::Errors::DomainError => e
     render_domain_error(e)
   end

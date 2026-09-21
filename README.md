@@ -7,6 +7,7 @@ API em Ruby on Rails para autenticação, multi-organização e evolução de um
 - Visão de estrutura e diretrizes de consistência: [`docs/zabbix-map-architecture.md`](docs/zabbix-map-architecture.md)
 - Guia de desenvolvimento assistido por IA e padrão de documentação contínua: [`docs/ai-development-guidelines.md`](docs/ai-development-guidelines.md)
 - Contrato sugerido para renderização no frontend: [`docs/api-contract.md`](docs/api-contract.md)
+- Backlog de maturidade e roadmap incremental do backend: [`docs/maturity-roadmap.md`](docs/maturity-roadmap.md)
 - Compatibilidade e estratégia para KMZ/KML e correlatos: [`docs/kmz-compatibility.md`](docs/kmz-compatibility.md)
 - Plano de execução da integração KMZ (importação desacoplada): [`docs/kmz-integration-execution-plan.md`](docs/kmz-integration-execution-plan.md)
 - Backlog técnico da integração KMZ (issues e PRs por fase): [`docs/kmz-integration-backlog.md`](docs/kmz-integration-backlog.md)

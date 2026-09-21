@@ -63,14 +63,27 @@ class Api::V1::Admin::UsersControllerTest < ActionDispatch::IntegrationTest
     patch "/api/v1/admin/users/#{@local_user.id}", params: {
       user: {
         email: "local.user.updated@example.com",
-        membership_role: "editor"
+        membership_role: "editor",
+        organization_id: @organization_b.id
       }
     }, headers: @auth_headers, as: :json
 
     assert_response :ok
     @local_user.reload
     assert_equal "local.user.updated@example.com", @local_user.email
-    assert_equal "editor", @local_user.memberships.order(:id).first.role
+    assert_equal "viewer", @local_user.memberships.find_by(organization_id: @organization).role
+    assert_equal "editor", @local_user.memberships.find_by(organization_id: @organization_b).role
+  end
+
+  test "update rejects membership role changes without organization when user has multiple memberships" do
+    patch "/api/v1/admin/users/#{@local_user.id}", params: {
+      user: {
+        membership_role: "viewer"
+      }
+    }, headers: @auth_headers, as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "INVALID_OPERATION", response.parsed_body["code"]
   end
 
   test "reset_password updates local user password" do

@@ -6,12 +6,12 @@ Este documento descreve um contrato recomendado para o frontend consumir mapas, 
 
 ### 0.1) Modo de tenancy da instalação
 
-A API agora suporta configuração por ambiente:
+A API suporta configuração por ambiente:
 
-- `TENANCY_MODE=multi` (padrão atual; compatível com `organization_id/org_id` em request)
+- `TENANCY_MODE=multi` (padrão; respeita `organization_id/org_id` em request)
 - `TENANCY_MODE=single` (single-tenant por instalação)
 
-No modo `single`, o backend resolve a organização local automaticamente (opcionalmente via `TENANCY_ORGANIZATION_ID`) e as chamadas podem omitir `organization_id`.
+No modo `single`, o backend resolve a organização local automaticamente (opcionalmente via `TENANCY_ORGANIZATION_ID`) e as chamadas podem omitir `organization_id`. Se a request trouxer `organization_id`, ele é aceito apenas para compatibilidade.
 
 Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT:
 
@@ -22,11 +22,19 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 - o token JWT expira em `4 horas` a partir do login.
 - a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
 - o login (`POST /api/v1/users/sign_in`) retorna apenas identidade (`id`, `email`, `admin`) e token, sem contexto de organização no payload.
+- login inválido responde `401` com o envelope canônico (`code=INVALID_CREDENTIALS`, `message=Invalid email or password`, `error` legado e `details` ausente).
 - com LDAP habilitado (`config/ldap.yml`), o login aceita `user.login` (ex.: `sAMAccountName`) além de `user.email`; fallback para autenticação local depende de `fallback_to_database_auth`.
 
 Além da autenticação, as operações de escrita (`create/update/destroy`) exigem papel de `admin` ou `editor` na organização do usuário.
 
 Também existe suporte a **admin global** (`users.admin = true`) para operações administrativas do sistema.
+
+Erros não-sucesso seguem um envelope canônico com compatibilidade retroativa:
+
+- campos principais: `data: nil`, `meta`, `errors`, `code`, `message`
+- alias legado preservado durante a migração: `error`
+- `errors` carrega o detalhe estruturado do problema; `code` varia por status (`VALIDATION_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `SERVICE_UNAVAILABLE`, `UNAUTHORIZED`)
+- quando houver `details`, ele é mantido no topo e também em `errors[].meta.details`
 
 ---
 
@@ -75,6 +83,7 @@ Regras:
 - listagem retorna `authentication_source` (`local` ou `ldap`) e `ldap_managed`;
 - `PATCH /reset_password` só funciona para usuários `local`;
 - usuários `ldap` devem trocar senha no Active Directory e a API retorna `422 INVALID_OPERATION` ao tentar reset local.
+- `PATCH /api/v1/admin/users/:id` aceita `organization_id` opcional para alterar `membership_role` quando o usuário possuir mais de uma membership; sem esse campo, a API retorna `422 INVALID_OPERATION` nesse cenário.
 
 Payload de update (`PATCH /api/v1/admin/users/:id`):
 
@@ -208,6 +217,8 @@ Criação/edição de endpoints do cabo aceita múltiplas formas de origem/desti
 - `source_site_id` / `target_site_id`: Site anexado ao mapa (backend resolve automaticamente para o `MapNode` de `mappable_type = "Site"`).
 
 Quando `source_site_id` ou `target_site_id` for informado e o Site não estiver anexado ao mapa, a API retorna `422` com erro de validação.
+
+Em conflitos de `geometry_version`, a API retorna `409 geometry_conflict` com o envelope canônico de erro (`data: nil`, `meta`, `errors`, `code`, `message`, `error` legado e `details` com `expected_version/current_version`).
 
 `PATCH .../geometry` aplica operações incrementais de edição de rota, sem sobrescrever todo o recurso de cabo:
 

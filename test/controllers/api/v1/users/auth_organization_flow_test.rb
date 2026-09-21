@@ -55,6 +55,24 @@ class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
     assert_not payload.key?("organization")
   end
 
+  test "sign in returns unauthorized envelope when credentials are invalid" do
+    post "/api/v1/users/sign_in", params: {
+      user: {
+        email: "missing@example.com",
+        password: "wrong-password"
+      }
+    }, as: :json
+
+    assert_response :unauthorized
+
+    body = response.parsed_body
+    assert_equal "INVALID_CREDENTIALS", body["code"]
+    assert_equal "Invalid email or password", body["message"]
+    assert_equal "Invalid email or password", body["error"]
+    assert_nil body["details"]
+    assert_nil body["data"]
+  end
+
   test "sign in authenticates via ldap when enabled" do
     user = User.create!(
       email: "ldap.user@example.com",

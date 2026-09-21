@@ -13,7 +13,7 @@ class Api::V1::DevicesController < Api::V1::BaseController
     devices = current_organization.devices.includes(:site, :zabbix_host_link).order(:name)
     devices = devices.where(site_id: params[:site_id]) if params[:site_id].present?
     devices = devices.where("name ILIKE ?", "%#{params[:search]}%") if params[:search].present?
-    render_data(data: devices.limit(50).map { |device| { value: device.id, label: device.name, code: device.hostname || device.id.to_s, meta: { site_id: device.site_id, role: device.role, status: device.status } } })
+    render_data(data: devices.limit(50).map { |device| Devices::DropdownPayloadBuilder.new(device).call })
   end
 
   def show
