@@ -7,9 +7,10 @@ module CableFusion
     belongs_to :network_cable
     belongs_to :published_by_user, class_name: "User", optional: true
 
+    # Links reference ports (FK), so they must be declared (and thus destroyed) before the nodes/ports.
+    has_many :links, class_name: "CableFusion::Link", foreign_key: :diagram_id, dependent: :destroy, inverse_of: :diagram
     has_many :nodes, class_name: "CableFusion::Node", foreign_key: :diagram_id, dependent: :destroy, inverse_of: :diagram
     has_many :ports, through: :nodes, source: :ports
-    has_many :links, class_name: "CableFusion::Link", foreign_key: :diagram_id, dependent: :destroy, inverse_of: :diagram
     has_many :snapshots, class_name: "CableFusion::Snapshot", foreign_key: :diagram_id, dependent: :destroy, inverse_of: :diagram
 
     validates :status, inclusion: { in: STATUSES }
