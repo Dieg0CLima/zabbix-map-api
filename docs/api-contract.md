@@ -69,6 +69,25 @@ No frontend, cada cabo é renderizado assim:
 - `GET /api/v1/network_maps/:id/events`
 - `GET /api/v1/network_maps/:id/cable_metrics`
 
+#### Editar nome e descrição do mapa (`PATCH /api/v1/network_maps/:id`)
+
+Body: `{ "network_map": { "name": string, "description": string | null } }` (o `PATCH` continua aceitando também `source_type`, `active_base_layer`, `zabbix_connection_id` e `metadata`; sem `name`/`description` no payload essas regras não são executadas). Exige admin global ou papel `admin`/`editor` (viewer recebe `403`); mapa de outra organização ou inexistente responde `404 NOT_FOUND`.
+
+| Campo | Regra |
+| --- | --- |
+| `name` | aparado; obrigatório; até 255 caracteres; sem caracteres de controle, U+2028/U+2029 nem formatação bidirecional (U+202A–U+202E, U+2066–U+2069); único na organização (comparação exata, diferencia maiúsculas) |
+| `description` | aparada; vazia ou só espaços vira `null`; até 2000 caracteres; aceita `\n`, `\r` e `\t`, mas não outros controles, U+2028/U+2029 nem formatação bidirecional |
+
+- ZWJ/ZWNJ e emojis são aceitos.
+- Tamanho e caracteres só são validados quando o campo **muda**: mapas legados com nome/descrição acima do limite continuam editáveis nos outros campos.
+- `POST /api/v1/network_maps` e a importação de KMZ não usam estas regras.
+- Erro de validação: `422`, `code = VALIDATION_ERROR`, com `errors[] = { source, detail, code }`, onde o `code` de cada item é `blank`, `too_long`, `taken` ou `invalid_characters`. A corrida de unicidade (outro mapa criado com o mesmo nome entre a validação e a gravação) responde o mesmo `taken`, nunca `500`.
+- O `PATCH` legado (`/api/v1/legacy/network_maps/:id`) usa o mesmo serviço e herda as regras só quando `name`/`description` mudam; responde no formato legado (`details` por atributo).
+
+`errors[].code` (tipo do erro de validação) agora acompanha `source` e `detail` em **todas** as respostas `422` de erro de registro (campo aditivo). Erros sem tipo específico usam `invalid`.
+
+`meta.capabilities.can_edit` (boolean) é devolvido em `GET /api/v1/network_maps` e `GET /api/v1/network_maps/:id`: `true` para admin global ou membership `admin`/`editor` (a mesma regra do `PATCH`), `false` para viewer. `editor_state.capabilities.can_edit_map` usa a mesma regra.
+
 ### Configuração LDAP / Active Directory
 
 ### Gestão de usuários (Admin)
