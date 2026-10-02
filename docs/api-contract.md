@@ -120,6 +120,22 @@ Regras:
 
 Os endpoints de importação aceitam `provider` (padrão `kmz`) e input via `file` (upload) ou `input` (texto KML), com `organization_id` no escopo da organização ativa.
 
+Destino da importação (opcional, compatível; sem os parâmetros abaixo o comportamento é o de sempre: cria o mapa com o nome do KMZ ou atualiza o mapa de mesmo nome da organização):
+- `network_map_id`: importa para um mapa existente da organização (outra organização ou id inexistente respondem `404 NOT_FOUND`);
+- `network_map_name`: nome do mapa a criar, no lugar do nome do KMZ. É aparado; vazio equivale a ausente; no máximo 255 caracteres, sem caracteres de controle ou quebras de linha. **Não pode ser enviado junto com `network_map_id`**;
+- `on_name_conflict`: `update` (padrão) ou `fail`. Só atua sem `network_map_id`. Com `fail`, o `apply` recusa quando já existe, na organização, um mapa com o nome efetivo (comparação exata, diferencia maiúsculas de minúsculas); o `preview` nunca falha por isso, apenas informa (`target_map.action = "updated"`);
+- a importação faz apenas **merge** por `external_id`: adiciona e atualiza nós, cabos e sites do KMZ e **nunca remove** o que já existe no mapa; o nome de um mapa existente não é alterado;
+- os parâmetros são validados no `preview`, no `apply` e no enfileiramento do `async` (erro síncrono `422`, sem enfileirar job nem criar status).
+
+Códigos de erro novos (`422`, envelope padrão; no modo assíncrono aparecem em `error.code` do status `failed`):
+- `import_invalid_map_name`: `network_map_name` inválido (`details.max_length`);
+- `import_map_name_with_target`: `network_map_name` junto com `network_map_id`;
+- `import_invalid_option`: `on_name_conflict` fora de `update|fail` (`details.param`, `details.allowed`);
+- `import_map_name_conflict`: `on_name_conflict=fail` e já existe mapa com o nome (`details.network_map_id`, `details.network_map_name`); no `async` também cobre o mapa criado entre o enfileiramento e a execução;
+- `import_target_map_not_found`: só no `async`, quando o mapa de `network_map_id` foi removido antes da execução do job.
+
+Resposta do `preview`: `target_map` agora traz também `network_map_name` (nome do mapa que será criado ou atualizado): `{ action, network_map_id, network_map_name }` (campo aditivo).
+
 Modo assíncrono (`apply`):
 - `POST /api/v1/network_maps/imports/apply` aceita `async=true`;
 - resposta `202 Accepted` retorna `import_id`, `status=queued` e `poll_url`;

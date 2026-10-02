@@ -6,12 +6,14 @@ module Maps
     class Run
       Result = Struct.new(:network_map, :summary, :report, :normalized_payload, :warnings, keyword_init: true)
 
-      def initialize(organization:, provider:, input:, mode:, network_map: nil, import_id: nil)
+      def initialize(organization:, provider:, input:, mode:, network_map: nil, network_map_name: nil, on_name_conflict: "update", import_id: nil)
         @organization = organization
         @provider = provider
         @input = input
         @mode = mode
         @network_map = network_map
+        @network_map_name = network_map_name
+        @on_name_conflict = on_name_conflict
         @import_id = import_id.presence || SecureRandom.uuid
       end
 
@@ -30,7 +32,9 @@ module Maps
             organization: @organization,
             normalized_payload: normalized_payload,
             mode: @mode,
-            network_map: @network_map
+            network_map: @network_map,
+            network_map_name: @network_map_name,
+            on_name_conflict: @on_name_conflict
           ).call
         end
 

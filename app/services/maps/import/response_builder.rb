@@ -16,7 +16,8 @@ module Maps
           warnings: Array(@result.warnings),
           target_map: {
             action: @result.summary[:map],
-            network_map_id: @result.network_map&.id
+            network_map_id: @result.network_map&.id,
+            network_map_name: @result.network_map&.name
           }
         }
       end

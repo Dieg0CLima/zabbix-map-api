@@ -55,6 +55,8 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       input: import_input,
       mode: mode,
       network_map: target_network_map,
+      network_map_name: destination_options.map_name,
+      on_name_conflict: destination_options.on_name_conflict,
       import_id: params[:import_id].to_s.presence
     ).call
   end
@@ -81,6 +83,8 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
   end
 
   def enqueue_async_apply
+    options = destination_options
+    target_map = target_network_map
     import_id = SecureRandom.uuid
     payload = serialized_input_for_job
 
@@ -90,7 +94,7 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       provider: provider_param,
       mode: "apply_async",
       requested_by_user_id: current_user.id,
-      network_map_id: target_network_map&.id
+      network_map_id: target_map&.id
     )
 
     Maps::Import::ApplyJob.perform_later(
@@ -98,7 +102,9 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
       import_id: import_id,
       provider: provider_param,
       input_payload: payload,
-      network_map_id: target_network_map&.id
+      network_map_id: target_map&.id,
+      network_map_name: options.map_name,
+      on_name_conflict: options.on_name_conflict
     )
 
     render_data(
@@ -133,10 +139,19 @@ class Api::V1::NetworkMapImportsController < Api::V1::BaseController
     ActiveModel::Type::Boolean.new.cast(params[:async])
   end
 
-  def target_network_map
-    map_id = params[:network_map_id].presence
-    return nil unless map_id
+  def destination_options
+    @destination_options ||= Maps::Import::DestinationOptions.parse(
+      network_map_name: params[:network_map_name],
+      on_name_conflict: params[:on_name_conflict],
+      target_map_given: params[:network_map_id].present?
+    )
+  end
 
-    current_organization.network_maps.find(map_id)
+  def target_network_map
+    return @target_network_map if defined?(@target_network_map)
+
+    destination_options
+    map_id = params[:network_map_id].presence
+    @target_network_map = map_id ? current_organization.network_maps.find(map_id) : nil
   end
 end
