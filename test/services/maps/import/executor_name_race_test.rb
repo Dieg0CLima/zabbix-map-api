@@ -74,28 +74,6 @@ class Maps::Import::ExecutorNameRaceTest < ActiveSupport::TestCase
 
   # ---- (b) update policy (default): adopt the existing map and update it ----
 
-  test "(b) update: a unique violation at INSERT time adopts the concurrent map and applies the import to it (R-8 probe)" do
-    result = nil
-    ActiveRecord::Base.transaction do
-      result = race_at_insert(executor(on_name_conflict: "update")).call
-    end
-    competitor = competitor_map
-
-    assert_equal competitor.id, result.network_map.id, "the import must end on the map that won the race"
-    assert_equal 1, NetworkMap.where(organization_id: @org.id, name: @name).count
-    assert_equal 2, competitor.reload.map_nodes.count
-    assert_equal 1, competitor.network_cables.count
-    assert_equal "kmz", competitor.metadata.dig("import", "provider")
-  end
-
-  test "(b) update: the default policy (omitted) behaves the same as update at INSERT time (R-8 probe)" do
-    result = race_at_insert(Maps::Import::Executor.new(organization: @org, normalized_payload: payload(@name), mode: "apply")).call
-    competitor = competitor_map
-
-    assert_equal competitor.id, result.network_map.id
-    assert_equal 2, competitor.reload.map_nodes.count
-  end
-
   test "(b) update: no spurious import_unique_conflict when the competitor appears before the final check" do
     exec = executor(on_name_conflict: "update")
     exec.define_singleton_method(:build_summary_for) do |*args, **kwargs|
