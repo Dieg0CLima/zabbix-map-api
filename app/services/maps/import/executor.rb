@@ -5,11 +5,13 @@ module Maps
     class Executor
       Result = Struct.new(:network_map, :summary, :report, :warnings, keyword_init: true)
 
-      def initialize(organization:, normalized_payload:, mode:, network_map: nil)
+      def initialize(organization:, normalized_payload:, mode:, network_map: nil, network_map_name: nil, on_name_conflict: "update")
         @organization = organization
         @normalized_payload = normalized_payload
         @mode = mode.to_s
         @network_map = network_map
+        @network_map_name = network_map_name.to_s.strip.presence
+        @on_name_conflict = on_name_conflict.to_s
         @warnings = []
       end
 
@@ -17,6 +19,7 @@ module Maps
         ensure_mode!
 
         target_map = resolve_target_map
+        ensure_no_name_conflict!(target_map) unless preview_mode?
         map_action = target_map.persisted? ? "updated" : "created"
         preview_summary = build_summary_for(target_map, map_action: map_action)
 
@@ -83,8 +86,38 @@ module Maps
         @organization.network_maps.find_or_initialize_by(name: normalized_map_name)
       end
 
+      # Name of the map that is created (or looked up by name): the name informed
+      # by the user, else the one in the KMZ.
       def normalized_map_name
-        @normalized_payload.dig("map", "name")
+        @network_map_name || @normalized_payload.dig("map", "name")
+      end
+
+      def fail_on_name_conflict?
+        @on_name_conflict == "fail" && @network_map.blank?
+      end
+
+      def ensure_no_name_conflict!(target_map)
+        return unless fail_on_name_conflict? && target_map.persisted?
+
+        raise name_conflict_error(target_map)
+      end
+
+      # The model validates name uniqueness, so a map created after resolve_target_map
+      # would surface as RecordInvalid; re-check right before saving to keep the
+      # `fail` policy answering with import_map_name_conflict.
+      def ensure_name_still_free!(network_map)
+        return unless fail_on_name_conflict? && network_map.new_record?
+
+        existing = @organization.network_maps.find_by(name: normalized_map_name)
+        raise name_conflict_error(existing) if existing
+      end
+
+      def name_conflict_error(existing)
+        Maps::Import::Errors::DomainError.new(
+          code: "import_map_name_conflict",
+          message: "A map with this name already exists",
+          details: { network_map_id: existing.id, network_map_name: existing.name }
+        )
       end
 
       def persist_map!(network_map)
@@ -102,11 +135,16 @@ module Maps
           active_base_layer: network_map.active_base_layer.presence || "standard",
           metadata: metadata
         )
-        network_map.save!
+        ensure_name_still_free!(network_map)
+
+        # Savepoint, so a unique violation does not abort the outer transaction
+        # and the rescue below can still query.
+        ActiveRecord::Base.transaction(requires_new: true) { network_map.save! }
       rescue ActiveRecord::RecordNotUnique
         # Concurrent import created the same map name between resolve_target_map and save.
         existing = @organization.network_maps.find_by(name: normalized_map_name)
         raise unless existing
+        raise name_conflict_error(existing) if fail_on_name_conflict?
 
         existing.update!(metadata: metadata)
         @network_map = existing

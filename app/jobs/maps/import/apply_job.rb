@@ -5,9 +5,9 @@ module Maps
     class ApplyJob < ApplicationJob
       queue_as :default
 
-      def perform(organization_id:, import_id:, provider:, input_payload:, network_map_id: nil)
+      def perform(organization_id:, import_id:, provider:, input_payload:, network_map_id: nil, network_map_name: nil, on_name_conflict: "update")
         organization = Organization.find(organization_id)
-        network_map = network_map_id.present? ? organization.network_maps.find(network_map_id) : nil
+        network_map = find_target_map!(organization, network_map_id)
         input = decode_input(input_payload)
 
         Maps::Import::StatusStore.running!(organization: organization, import_id: import_id)
@@ -18,6 +18,8 @@ module Maps
           input: input,
           mode: "apply",
           network_map: network_map,
+          network_map_name: network_map_name,
+          on_name_conflict: on_name_conflict,
           import_id: import_id
         ).call
 
@@ -50,6 +52,17 @@ module Maps
       end
 
       private
+
+      def find_target_map!(organization, network_map_id)
+        return nil if network_map_id.blank?
+
+        organization.network_maps.find(network_map_id)
+      rescue ActiveRecord::RecordNotFound
+        raise Maps::Import::Errors::DomainError.new(
+          code: "import_target_map_not_found",
+          message: "Target map not found"
+        )
+      end
 
       def decode_input(payload)
         source = payload.is_a?(Hash) ? payload.deep_symbolize_keys : {}
