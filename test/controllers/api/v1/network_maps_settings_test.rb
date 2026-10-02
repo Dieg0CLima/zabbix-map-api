@@ -1,20 +1,10 @@
 require "test_helper"
+require_relative "../../../support/skippable_uniqueness"
 
 # REQ-006 (API): edit name/description of a map (PATCH /api/v1/network_maps/:id), capabilities and error codes.
 # "(characterization)" marks behavior that exists today and must keep passing; the rest is new behavior.
 # Ambiguous/invisible Unicode is always built from code points, never typed as a literal.
 class Api::V1::NetworkMapsSettingsTest < ActionDispatch::IntegrationTest
-  # Shared with the ActiveRecord uniqueness validator so a test can simulate the race (CA8): when the flag is set,
-  # the Rails-level uniqueness check is skipped and only the unique index answers.
-  module SkippableUniqueness
-    def validate_each(record, attribute, value)
-      return if Thread.current[:skip_uniqueness_validation]
-
-      super
-    end
-  end
-  ActiveRecord::Validations::UniquenessValidator.prepend(SkippableUniqueness)
-
   ZWJ = [ 0x200D ].pack("U").freeze
   ZWNJ = [ 0x200C ].pack("U").freeze
   LS = [ 0x2028 ].pack("U").freeze
@@ -240,12 +230,9 @@ class Api::V1::NetworkMapsSettingsTest < ActionDispatch::IntegrationTest
     previous = @map.name
 
     response_status = nil
-    Thread.current[:skip_uniqueness_validation] = true
-    begin
+    SkippableUniqueness.skipping do
       patch_map(@map, name: "Nome Disputado")
       response_status = response.status
-    ensure
-      Thread.current[:skip_uniqueness_validation] = false
     end
 
     assert_equal 422, response_status

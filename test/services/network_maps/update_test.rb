@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "../../support/skippable_uniqueness"
 
 # REQ-006: normalization performed by NetworkMaps::Update before assigning (RN8).
 class NetworkMaps::UpdateTest < ActiveSupport::TestCase
@@ -39,13 +40,19 @@ class NetworkMaps::UpdateTest < ActiveSupport::TestCase
   test "CA8: a RecordNotUnique from the index becomes a RecordInvalid with a taken error on name (no 500)" do
     competitor = @org.network_maps.create!(name: "Disputado")
     error = nil
-    Thread.current[:skip_uniqueness_validation] = true
-    begin
+
+    SkippableUniqueness.skipping do
+      # Proof that the Rails-level uniqueness check is out of the way: the same assignment is valid in the
+      # map_settings context, so the only possible source of the :taken error below is the rescue of the index violation.
+      probe = NetworkMap.find(@map.id)
+      probe.name = competitor.name
+      assert probe.valid?(:map_settings), "the uniqueness validation must be skipped for this test to exercise the rescue"
+
       error = assert_raises(ActiveRecord::RecordInvalid) { NetworkMaps::Update.new(network_map: @map, payload: { name: competitor.name }).call }
-    ensure
-      Thread.current[:skip_uniqueness_validation] = false
     end
 
     assert_equal :taken, error.record.errors.details[:name].first[:error]
+    assert_equal "Disputado", competitor.reload.name
+    assert_not_equal "Disputado", @map.reload.name
   end
 end
