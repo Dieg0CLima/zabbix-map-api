@@ -3,11 +3,14 @@ class Api::V1::NetworkMapsV2Controller < Api::V1::BaseController
   before_action :set_network_map, only: %i[show update destroy health metrics events cable_metrics editor_state available_sites available_devices]
 
   def index
-    render_data(data: current_organization.network_maps.order(:id).map { |map| Api::V1::NetworkMapSerializer.new(map).as_json })
+    render_data(
+      data: current_organization.network_maps.order(:id).map { |map| Api::V1::NetworkMapSerializer.new(map).as_json },
+      meta: capabilities_meta
+    )
   end
 
   def show
-    render_data(data: Api::V1::NetworkMapSerializer.new(@network_map).as_json)
+    render_data(data: Api::V1::NetworkMapSerializer.new(@network_map).as_json, meta: capabilities_meta)
   end
 
   def create
@@ -30,7 +33,7 @@ class Api::V1::NetworkMapsV2Controller < Api::V1::BaseController
   end
 
   def editor_state
-    render_data(data: NetworkMaps::FetchEditorState.new(network_map: @network_map, current_membership: current_membership).call)
+    render_data(data: NetworkMaps::FetchEditorState.new(network_map: @network_map, current_membership: current_membership, can_edit: can_edit?).call)
   end
 
   def available_sites
@@ -65,6 +68,15 @@ class Api::V1::NetworkMapsV2Controller < Api::V1::BaseController
   end
 
   private
+
+  # Same rule as require_editor_or_admin!: global admin or admin/editor membership.
+  def can_edit?
+    current_user.admin? || current_membership&.role.in?(%w[admin editor]) || false
+  end
+
+  def capabilities_meta
+    { capabilities: { can_edit: can_edit? } }
+  end
 
   def set_network_map
     @network_map = find_record(current_organization.network_maps, params[:id] || params[:map_id])

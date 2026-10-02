@@ -1,7 +1,8 @@
 class NetworkMaps::FetchEditorState
-  def initialize(network_map:, current_membership: nil)
+  def initialize(network_map:, current_membership: nil, can_edit: nil)
     @network_map = network_map
     @current_membership = current_membership
+    @can_edit = can_edit
   end
 
   def call
@@ -38,6 +39,8 @@ class NetworkMaps::FetchEditorState
   end
 
   def can_edit?
+    return @can_edit unless @can_edit.nil?
+
     @current_membership&.role.in?(%w[admin editor])
   end
 end

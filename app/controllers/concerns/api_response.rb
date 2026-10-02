@@ -32,9 +32,15 @@ module ApiResponse
     render_errors(
       status:,
       errors: record.errors.map do |error|
-        { source: error.attribute, detail: error.message }
+        { source: error.attribute, detail: error.message, code: error_code_for(error) }
       end
     )
+  end
+
+  # Validation error type (:blank, :taken, :too_long...). Errors added with a plain
+  # message have no type; they are reported as "invalid".
+  def error_code_for(error)
+    error.type.is_a?(Symbol) ? error.type.to_s : "invalid"
   end
 
   def status_to_error_code(status)
