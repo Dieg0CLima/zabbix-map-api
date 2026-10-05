@@ -78,7 +78,11 @@ class Api::V1::Users::PublicSignupFlagTest < ActionDispatch::IntegrationTest
     assert_raises(RuntimeError) { with_public_signup("true") { raise "boom" } }
 
     assert_equal before_present, ENV.key?(PublicSignupFlag::KEY)
-    assert_equal before_value, ENV[PublicSignupFlag::KEY]
+    if before_value.nil?
+      assert_nil ENV[PublicSignupFlag::KEY]
+    else
+      assert_equal before_value, ENV[PublicSignupFlag::KEY]
+    end
   end
 
   # ---- CA2: disabled has no effect ----
