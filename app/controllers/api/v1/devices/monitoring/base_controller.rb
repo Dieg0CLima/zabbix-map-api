@@ -1,10 +1,9 @@
 class Api::V1::Devices::Monitoring::BaseController < Api::V1::BaseController
-  WRITE_ACTIONS = %w[create update destroy].freeze
-
-  # Write actions need editor/admin. Declared before set_device so the guard answers
-  # before the device is looked up (same 403 for a missing or foreign device). A
-  # condition instead of `only:` because not every subclass defines all of them.
-  before_action :require_editor_or_admin!, if: -> { WRITE_ACTIONS.include?(action_name) }
+  # Fail closed: every request that is not GET/HEAD needs editor/admin, whatever the
+  # action is called, so a future write action cannot be born open to viewers.
+  # Declared before set_device so the guard answers before the device is looked up
+  # (same 403 for a missing or foreign device).
+  before_action :require_editor_or_admin!, unless: -> { request.get? || request.head? }
   before_action :set_device
 
   private
