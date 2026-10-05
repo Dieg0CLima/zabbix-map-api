@@ -1,27 +1,32 @@
 require "test_helper"
+require_relative "../../../../support/public_signup_flag"
 
 class Api::V1::Users::AuthOrganizationFlowTest < ActionDispatch::IntegrationTest
+  include PublicSignupFlag
+
   test "sign up returns created organization payload" do
-    assert_difference [ "User.count", "Organization.count", "Membership.count" ], 1 do
-      post "/api/v1/users", params: {
-        user: {
-          email: "new.user@example.com",
-          password: "Password!123",
-          password_confirmation: "Password!123",
-          organization_name: "Acme Networks"
-        }
-      }, as: :json
+    with_public_signup("true") do
+      assert_difference [ "User.count", "Organization.count", "Membership.count" ], 1 do
+        post "/api/v1/users", params: {
+          user: {
+            email: "new.user@example.com",
+            password: "Password!123",
+            password_confirmation: "Password!123",
+            organization_name: "Acme Networks"
+          }
+        }, as: :json
+      end
+
+      assert_response :created
+
+      payload = response.parsed_body.fetch("data")
+      organization = payload.fetch("organization")
+
+      assert_equal "new.user@example.com", payload["email"]
+      assert_equal "Acme Networks", organization["name"]
+      assert_equal "acme-networks", organization["slug"]
+      assert_equal "admin", organization["role"]
     end
-
-    assert_response :created
-
-    payload = response.parsed_body.fetch("data")
-    organization = payload.fetch("organization")
-
-    assert_equal "new.user@example.com", payload["email"]
-    assert_equal "Acme Networks", organization["name"]
-    assert_equal "acme-networks", organization["slug"]
-    assert_equal "admin", organization["role"]
   end
 
   test "sign in returns identity payload without organization context" do
