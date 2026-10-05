@@ -17,7 +17,7 @@ Todos os endpoints de negócio em `/api/v1` exigem autenticação via Devise/JWT
 
 - `POST /api/v1/users/sign_in` para login (retorna `Authorization: Bearer <token>`).
 - `DELETE /api/v1/users/sign_out` para logout.
-- `POST /api/v1/users` para cadastro.
+- `POST /api/v1/users` para cadastro. **Desativado por padrão**: só funciona com `ALLOW_PUBLIC_SIGNUP=true` (qualquer outro valor, ou ausente, desativa; lido a cada requisição). Desativado, `POST /api/v1/users`, `GET /api/v1/users/sign_up` e `GET /api/v1/users/cancel` respondem `404 NOT_FOUND` e nada é criado. Ativado, `organization_id` é recusado (`422 VALIDATION_ERROR`): o cadastro público só cria uma organização nova (`organization_name`) ou um usuário sem organização, e nunca entra em organização existente. Não habilitar em produção.
 - enviar sempre `Authorization: Bearer <token>` nas chamadas autenticadas.
 - o token JWT expira em `4 horas` a partir do login.
 - a cada requisição autenticada em `/api/v1`, a API retorna um novo `Authorization` (renovação deslizante); sem atividade por 4 horas, o token expira e o usuário precisa autenticar novamente.
