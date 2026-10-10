@@ -25,7 +25,9 @@ class Devices::DestroyDevice
       destroy_map_nodes
       ZabbixLink.where(linkable_type: "DeviceInterface", linkable_id: @device.device_interfaces.select(:id)).destroy_all
       ZabbixLink.where(linkable: @device).destroy_all
-      NetworkLink.for_device(@device.id).delete_all
+      network_link_ids = NetworkLink.for_device(@device.id).pluck(:id)
+      NetworkCable.where(network_link_id: network_link_ids).update_all(network_link_id: nil)
+      NetworkLink.where(id: network_link_ids).delete_all
       @device.reload.destroy!
       impact
     end
