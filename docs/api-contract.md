@@ -604,6 +604,7 @@ O payload continua retornando `pops`, `nodes` e `cables`, mas agora com:
 - `GET /api/v1/devices` lista dispositivos com dados de inventário e link para Zabbix.
 - `GET /api/v1/devices/:id` retorna o registro completo de um dispositivo, interfaces coletadas do host vinculado e itens disponíveis.
 - `GET /api/v1/devices/:id/dashboard` resume o host do Zabbix e os itens vinculados à interface, incluindo os últimos valores coletados direto de `history_uint`.
+- `GET /api/v1/devices/:id/removal_impact`, `DELETE /api/v1/devices/:id` e `GET /api/v1/devices/:id/zabbix_candidates`: substituição de equipamento (REQ-009), descritos na seção "Substituição de equipamento" abaixo.
 
 ### `GET /api/v1/devices/:id`
 
@@ -672,6 +673,37 @@ O payload continua retornando `pops`, `nodes` e `cables`, mas agora com:
 - Quando a conexão com o Zabbix não está ativa (sem `db_enabled?`), a rota retorna `{"host": null, "items": [], "interface_items": []}` para o frontend lidar com ausência de dados.
 
 ---
+
+### Substituição de equipamento (REQ-009)
+
+Todas as ações abaixo exigem editor ou admin da organização (viewer 403, anônimo 401, equipamento de outra organização 404). O Zabbix é sempre somente leitura; nada aqui escreve nele.
+
+#### `GET /api/v1/devices/:id/removal_impact`
+200:
+```json
+{ "data": { "device_id": 12, "has_dependencies": true,
+  "maps": [ { "id": 3, "name": "Mapa Ferreiros", "node_count": 1 } ],
+  "zabbix_links": { "device": 1, "interfaces": 2 },
+  "interfaces": 2, "network_links": 0, "cables_left_without_endpoint": 2 } }
+```
+`has_dependencies` é verdadeiro se houver mapas, vínculos Zabbix (do equipamento ou das interfaces) ou `network_links`. Interfaces sozinhas não exigem confirmação.
+
+#### `DELETE /api/v1/devices/:id`
+- Parâmetro opcional `confirm`: só `true` ou `"true"` confirma (qualquer outro valor não confirma).
+- 200: `{ "data": { "removed": true, "impact": { ...mesmo formato de removal_impact } } }`. Antes devolvia `data: null`.
+- 422 sem confirmação quando `has_dependencies`: `errors[0].code = "DEVICE_REMOVAL_NEEDS_CONFIRMATION"`, `errors[0].detail` em pt-BR, `errors[0].meta.impact` e `meta.impact` com o mesmo objeto de `removal_impact`. Nada é apagado. Sem dependências, o equipamento é removido mesmo sem `confirm`.
+- Cascata em uma única transação: nós de mapa (com itens, bindings e arestas), `zabbix_links` do equipamento e das interfaces, interfaces, perfil de monitoramento e `network_links` (origem ou destino). Cabos permanecem, com `source_node_id`/`target_node_id` nulos no lado removido.
+- Falha no meio da cascata: nada é removido; 422 (`DEVICE_REMOVAL_FAILED`) ou 500 (`DEVICE_REMOVAL_FAILED`) com mensagem em pt-BR.
+
+#### `GET /api/v1/devices/:id/zabbix_candidates`
+- Parâmetros: `zabbix_connection_id` (obrigatório se o equipamento não tem vínculo; senão usa a conexão atual), `ip` (opcional; padrão `management_ip`; IPv4/IPv6 completo, sem máscara).
+- 200: `data: [ { hostid, name, host, status, available, interfaces: [{ip,dns,type,main}], inventory: {vendor,model}, metadata, suggested_device_attributes: {name,hostname,management_ip,vendor,model}, linked_device: {id,name}|null } ]`. Até 20 candidatos, com interface de IP exatamente igual ao informado, hosts com `main` primeiro e depois por nome. `linked_device` é o outro equipamento que já usa o host (nulo se livre ou se for o próprio equipamento).
+- 422 `VALIDATION_ERROR`: sem IP (nem `management_ip`), IP inválido, ou sem conexão. 404: conexão de outra organização. 503 `SERVICE_UNAVAILABLE`: Zabbix indisponível (nada é alterado).
+
+#### Religar a outro host (`PATCH /api/v1/devices/:id` e `PATCH /api/v1/devices/:id/monitoring/host-link`)
+- Assinatura inalterada. Para religar: `zabbix_connection_id`, `zabbix_host_id` e, opcionalmente, `hostname`, `vendor`, `model`, `management_ip` (só o que for enviado muda; `serial_number` nunca é alterado pelo fluxo).
+- Vincular um host já usado por outro equipamento: 422 `VALIDATION_ERROR` em `errors[0].detail` (pt-BR, cita o nome do outro equipamento), `source: "zabbix_host_id"`.
+- Ao trocar para um `hostid` (ou conexão) diferente, os itens de monitoramento do equipamento e os `map_monitoring_bindings` do vínculo antigo são apagados na mesma transação. Resposta traz `meta.removed_monitoring = { "items": n, "bindings": n }` (zeros quando nada foi apagado). Se o religar falhar, nada é apagado.
 
 ## 5) Estratégia no frontend (React/Vue/Canvas/SVG)
 

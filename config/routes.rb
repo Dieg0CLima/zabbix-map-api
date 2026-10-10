@@ -37,6 +37,8 @@ Rails.application.routes.draw do
         end
         member do
           get :dashboard
+          get :removal_impact
+          get :zabbix_candidates
           patch :site_link
         end
         resources :interfaces, controller: "device_interfaces", only: %i[index create update destroy]

@@ -1,6 +1,6 @@
 class Api::V1::DevicesController < Api::V1::BaseController
-  before_action :require_editor_or_admin!, only: %i[create update destroy site_link]
-  before_action :set_device, only: %i[show dashboard update destroy site_link]
+  before_action :require_editor_or_admin!, only: %i[create update destroy site_link removal_impact zabbix_candidates]
+  before_action :set_device, only: %i[show dashboard update destroy site_link removal_impact zabbix_candidates]
 
   def index
     devices = current_organization.devices.includes(:zabbix_host_link).order(:id)
@@ -33,17 +33,40 @@ class Api::V1::DevicesController < Api::V1::BaseController
   end
 
   def update
-    device = Devices::UpdateDevice.new(device: @device, params: device_params.to_h.deep_symbolize_keys, actor: current_user).call
-    render_data(data: Api::V1::DeviceSerializer.new(device).as_json)
+    service = Devices::UpdateDevice.new(device: @device, params: device_params.to_h.deep_symbolize_keys, actor: current_user)
+    device = service.call
+    render_data(data: Api::V1::DeviceSerializer.new(device).as_json, meta: { removed_monitoring: service.removed_monitoring })
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
 
+  def removal_impact
+    render_data(data: Devices::RemovalImpact.new(device: @device).call)
+  end
+
   def destroy
-    @device.destroy!
-    render_data(data: nil)
+    impact = Devices::DestroyDevice.new(device: @device).call(confirm: removal_confirmed?)
+    render_data(data: { removed: true, impact: impact })
+  rescue Devices::DestroyDevice::ConfirmationRequired => e
+    render_removal_needs_confirmation(e.impact)
   rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::DeleteRestrictionError
-    render_record_errors(@device)
+    render_removal_failed(:unprocessable_entity)
+  rescue ActiveRecord::ActiveRecordError => e
+    Rails.logger.error("[DevicesController#destroy] #{e.class}")
+    render_removal_failed(:internal_server_error)
+  end
+
+  def zabbix_candidates
+    connection = candidates_connection
+    return if performed?
+
+    ip = candidates_ip
+    return if performed?
+
+    candidates = Devices::ZabbixCandidates.new(device: @device, connection: connection, ip: ip).call
+    render_data(data: candidates)
+  rescue Zabbix::HostCandidatesFetcher::Error
+    render_errors(status: :service_unavailable, errors: [ { detail: "Não foi possível consultar o Zabbix agora. Tente novamente em instantes; nenhum dado do equipamento foi alterado." } ])
   end
 
   def site_link
@@ -57,6 +80,76 @@ class Api::V1::DevicesController < Api::V1::BaseController
   end
 
   private
+
+  def removal_confirmed?
+    [ true, "true" ].include?(params[:confirm])
+  end
+
+  def render_removal_needs_confirmation(impact)
+    detail = removal_confirmation_text(impact)
+    render_errors(
+      status: :unprocessable_entity,
+      code: "DEVICE_REMOVAL_NEEDS_CONFIRMATION",
+      errors: [ { code: "DEVICE_REMOVAL_NEEDS_CONFIRMATION", detail: detail, meta: { impact: impact } } ],
+      meta: { impact: impact }
+    )
+  end
+
+  def removal_confirmation_text(impact)
+    zabbix_links = impact[:zabbix_links].values.sum
+    parts = []
+    parts << "#{impact[:maps].size} mapa(s)" if impact[:maps].any?
+    parts << "#{zabbix_links} vínculo(s) com o Zabbix" if zabbix_links.positive?
+    parts << "#{impact[:network_links]} link(s) de rede" if impact[:network_links].positive?
+    text = "Este equipamento está em uso (#{parts.join(', ')}). Confirme a remoção para apagar esses registros."
+    text += " #{impact[:cables_left_without_endpoint]} cabo(s) ficarão sem ponta." if impact[:cables_left_without_endpoint].positive?
+    "#{text} Esta ação não altera o Zabbix e não pode ser desfeita."
+  end
+
+  def render_removal_failed(status)
+    render_errors(
+      status: status,
+      code: "DEVICE_REMOVAL_FAILED",
+      errors: [ { code: "DEVICE_REMOVAL_FAILED", detail: "Não foi possível remover o equipamento. Nenhuma alteração foi feita. Tente novamente; se o erro persistir, contate o suporte." } ]
+    )
+  end
+
+  def candidates_connection
+    if params[:zabbix_connection_id].present?
+      connection = current_organization.zabbix_connections.find_by(id: params[:zabbix_connection_id])
+      return connection if connection
+
+      render_errors(status: :not_found, errors: [ { detail: "Conexão Zabbix não encontrada" } ])
+      return
+    end
+
+    connection = @device.zabbix_connection
+    return connection if connection
+
+    render_errors(status: :unprocessable_entity, errors: [ { source: :zabbix_connection_id, detail: "Informe a conexão Zabbix (zabbix_connection_id): o equipamento ainda não está vinculado a um host." } ])
+    nil
+  end
+
+  def candidates_ip
+    ip = params[:ip].to_s.strip.presence || @device.management_ip.to_s.strip.presence
+    if ip.nil?
+      render_errors(status: :unprocessable_entity, errors: [ { source: :ip, detail: "Informe o IP: o equipamento não tem IP de gerência cadastrado." } ])
+      return
+    end
+    return ip if valid_ip?(ip)
+
+    render_errors(status: :unprocessable_entity, errors: [ { source: :ip, detail: "IP inválido. Use um endereço IPv4 ou IPv6 completo, sem máscara." } ])
+    nil
+  end
+
+  def valid_ip?(value)
+    return false unless value.match?(/\A[0-9a-fA-F:.]+\z/)
+
+    IPAddr.new(value)
+    true
+  rescue IPAddr::Error
+    false
+  end
 
   def dashboard_limit
     limit = params[:limit] || params.dig(:dashboard, :limit)
