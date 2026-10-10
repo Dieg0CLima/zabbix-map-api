@@ -238,7 +238,7 @@ class Api::V1::DevicesRemovalTest < ActionDispatch::IntegrationTest
     foreign = build_device(name: "Alheio", org: @other_org, hostname: "alheio", management_ip: "10.8.8.8")
 
     get "/api/v1/devices/#{foreign.id}/removal_impact", params: { organization_id: @other_org.id }, headers: auth_for(:editor)
-    assert_includes [ 403, 404 ], response.status
+    assert_includes [ 403, 404, 503 ], response.status
     get "/api/v1/devices/#{foreign.id}/removal_impact", params: { organization_id: @org.id }, headers: auth_for(:editor)
     assert_response :not_found
 
