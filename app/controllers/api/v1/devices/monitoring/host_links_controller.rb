@@ -5,10 +5,10 @@ class Api::V1::Devices::Monitoring::HostLinksController < Api::V1::Devices::Moni
       organization: current_organization,
       params: host_link_params
     )
-    service.call
+    removed = service.call
     @device.reload
     profile = Devices::MonitoringProfileSync.new(device: @device).call
-    render_data(data: Api::V1::Devices::Monitoring::ProfileSerializer.new(profile).as_json)
+    render_data(data: Api::V1::Devices::Monitoring::ProfileSerializer.new(profile).as_json, meta: { removed_monitoring: removed })
   rescue ActiveRecord::RecordInvalid => e
     render_record_errors(e.record)
   end
