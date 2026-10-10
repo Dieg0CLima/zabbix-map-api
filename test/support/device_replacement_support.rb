@@ -90,9 +90,10 @@ module DeviceReplacementSupport
   # `network_links` has no model; rows are created with SQL.
   def insert_network_link(org, source_device_id:, target_device_id:)
     conn = ActiveRecord::Base.connection
-    conn.execute(<<~SQL.squish)
+    conn.select_value(<<~SQL.squish)
       INSERT INTO network_links (organization_id, external_id, source_device_id, target_device_id, link_type, status, metadata, created_at, updated_at)
       VALUES (#{org.id.to_i}, #{conn.quote("link-#{SecureRandom.hex(4)}")}, #{source_device_id ? source_device_id.to_i : 'NULL'}, #{target_device_id ? target_device_id.to_i : 'NULL'}, 'logical', 'planned', '{}', NOW(), NOW())
+      RETURNING id
     SQL
   end
 

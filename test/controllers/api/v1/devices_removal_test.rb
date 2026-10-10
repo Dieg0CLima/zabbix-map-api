@@ -310,6 +310,24 @@ class Api::V1::DevicesRemovalTest < ActionDispatch::IntegrationTest
     assert Device.exists?(bare.id)
   end
 
+  test "CA18: a cable whose network_link_id points to a removed network_link is kept, with network_link_id nil and no endpoint" do
+    build_map_dependencies(map_count: 1)
+    other = build_device(name: "Vizinho", hostname: "vizinho", management_ip: "10.3.3.3")
+    link_id = insert_network_link(@org, source_device_id: @device.id, target_device_id: other.id)
+    cable = @cables.first
+    cable.update_column(:network_link_id, link_id)
+
+    remove(@device, confirm: true)
+
+    assert_response :ok
+    assert_not Device.exists?(@device.id)
+    assert_equal 0, network_links_count(@device.id)
+    cable.reload
+    assert_nil cable.network_link_id
+    assert_nil cable.source_node_id
+    assert_not_nil cable.target_node_id
+  end
+
   private
 
   # Trigger no DELETE de devices: a cascata inteira já rodou quando ele estoura, então só uma
